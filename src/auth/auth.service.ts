@@ -24,17 +24,13 @@ export class AuthService {
     }
 
     const tenant = await this.tenantModel.create({
-      name: dto.blogName,
-      slug: dto.blogSlug,
+      name: dto.userName,
+ 
     });
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // await this.userModel.create({
-    //   email: dto.email,
-    //   passwordHash,
-    //   tenantId: tenant._id,
-    // });
+ 
     await this.userModel.create({
   email: dto.email,
   passwordHash,

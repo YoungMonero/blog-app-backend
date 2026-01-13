@@ -8,8 +8,8 @@ export class Tenant extends Document {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, unique: true })
-  slug: string;
+//   @Prop({ required: true, unique: true })
+//   slug: string;
 }
 
 export const TenantSchema = SchemaFactory.createForClass(Tenant);

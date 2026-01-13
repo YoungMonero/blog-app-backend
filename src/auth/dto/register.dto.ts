@@ -8,8 +8,7 @@ export class RegisterDto {
   password: string;
 
   @IsNotEmpty()
-  blogName: string;
+  userName: string;
 
-  @IsNotEmpty()
-  blogSlug: string;
+
 }
