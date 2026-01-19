@@ -71,7 +71,6 @@
 //   }
 // }
 
-
 import {
   Controller,
   Post,
@@ -81,9 +80,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BlogsService } from './blogs.service';
 import { CreateBlogDto } from './dto/create-blog.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthRequest } from 'src/auth/type/auth-request.type';
 
 @Controller('blogs')
@@ -91,6 +90,7 @@ import type { AuthRequest } from 'src/auth/type/auth-request.type';
 export class BlogsController {
   constructor(private readonly blogsService: BlogsService) {}
 
+  // ✅ Create blog
   @Post()
   async createBlog(
     @Body() body: CreateBlogDto,
@@ -100,9 +100,10 @@ export class BlogsController {
     return this.blogsService.createBlog(body, tenantId);
   }
 
+  // ✅ Get current user's blog
   @Get('me')
   async getMyBlog(@Req() req: AuthRequest) {
     const tenantId = req.user.tenantId;
-    return this.blogsService.getBlogByTenant(tenantId); // ✅ now matches service
+    return this.blogsService.getBlogByTenant(tenantId);
   }
 }

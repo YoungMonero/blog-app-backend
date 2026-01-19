@@ -1,3 +1,14 @@
+// import { IsString, IsNotEmpty } from 'class-validator';
+
+// export class CreateBlogDto {
+//   @IsString()
+//   @IsNotEmpty()
+//   title: string;
+
+//   description?: string;
+// }
+
+
 import { IsString, IsNotEmpty } from 'class-validator';
 
 export class CreateBlogDto {
@@ -5,5 +16,7 @@ export class CreateBlogDto {
   @IsNotEmpty()
   title: string;
 
-  description?: string;
+  @IsString()
+  @IsNotEmpty()
+  description: string;
 }

@@ -1,3 +1,4 @@
+
 // import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 // import { Document } from 'mongoose';
 
@@ -9,16 +10,17 @@
 //   @Prop({ required: true, unique: true })
 //   slug: string;
 
-//   @Prop({ required: true })
-//   description: string;
+//   @Prop()
+//   description?: string;
 
 //   @Prop({ required: true })
-//   tenantId: string; // links blog to tenant
+//   tenantId: string;
 // }
 
 // export const BlogSchema = SchemaFactory.createForClass(Blog);
 
 
+// src/blogs/blog.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -30,10 +32,11 @@ export class Blog extends Document {
   @Prop({ required: true, unique: true })
   slug: string;
 
-  @Prop()
-  description?: string;
-
   @Prop({ required: true })
+  description: string;
+
+  // 👇 THIS IS IMPORTANT
+  @Prop({ required: true, unique: true })
   tenantId: string;
 }
 
