@@ -5,8 +5,6 @@ import { Tenant } from './tenant.schema';
 import { CreateTenantDto } from './tenant.dto';
 
 
-
-
 @Injectable()
 export class TenantService {
   constructor(

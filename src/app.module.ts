@@ -32,15 +32,15 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 import { TenantModule } from './tenants/tenant.module';
 import { BlogsModule } from './blogs/blogs.module';
+import { PostController } from './post/post.controller';
+import { PostModule } from './post/post.module';
 
 @Module({
   imports: [
-    // Environment variables
+
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-
-    // MongoDB connection
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -48,10 +48,11 @@ import { BlogsModule } from './blogs/blogs.module';
       }),
     }),
 
-    // Feature modules
     AuthModule,
     TenantModule,
     BlogsModule,
+    PostModule,
   ],
+  controllers: [PostController],
 })
 export class AppModule {}

@@ -26,7 +26,7 @@ export class AuthService {
     // ✅ Use "new this.userModel" so _id is generated immediately
     const user = new this.userModel({
       email: dto.email,
-      username: dto.username,
+      username: dto.userName,
       passwordHash,
     });
 
