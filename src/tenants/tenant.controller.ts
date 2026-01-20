@@ -14,7 +14,7 @@ export class TenantController {
     @Body() dto: CreateTenantDto,
     @Request() req,
   ) {
-    return this.tenantService.createTenant(dto, req.user.userId);
+    return this.tenantService.createTenant(dto.name, dto.slug, req.user.userId);
   }
 
   @Get('me')
