@@ -1,89 +1,82 @@
 import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Delete, 
-  Body, 
-  Param, 
-  UseGuards,
-  Req,
-  HttpCode,
-  HttpStatus,
-  UnauthorizedException,
-  BadRequestException
+  Controller, Get, Post, Body, Patch, Param, Delete, 
+  UseGuards, Req, ForbiddenException, BadRequestException 
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Request } from 'express';
-
-interface JwtPayload {
-  userId: string;
-  sub: string;
-  tenantId?: string;
-  email?: string;
-}
-
-interface AuthRequest extends Request {
-  user: JwtPayload;
-}
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
 export class PostController {
-  constructor(private readonly postService: PostService) {}
 
-  // This method now GUARANTEES a string return
-  private getUserId(req: AuthRequest): string {
-    const userId = req.user?.userId || req.user?.sub;
-    
-    if (!userId) {
-      console.error('No userId in JWT payload:', req.user);
-      throw new UnauthorizedException('Authentication failed: No user ID in token');
+  constructor(
+    private readonly postService: PostService
+  ) {}
+ 
+  @Post() 
+  async create(@Body() createPostDto: CreatePostDto, @Req() req) {
+    try {
+      // 1. Extract values directly from the JWT (attached by JwtAuthGuard)
+      const userId = req.user.sub || req.user.userId;
+      const tenantId = req.user.tenantId;
+
+      console.log('--- Post Create Debug ---');
+      console.log('User ID:', userId);
+      console.log('Tenant ID from Token:', tenantId);
+
+      // 2. Verification
+      if (!tenantId) {
+        console.error('ERROR: User token missing tenantId. User must re-login.');
+        throw new ForbiddenException('No blog/tenant associated with this account payload.');
+      }
+
+      // 3. Create Post linked to both the person (author) and the blog (tenant)
+      return await this.postService.create(createPostDto, userId, tenantId);
+    } catch (error) {
+      console.error('Create Post Error:', error.message);
+      throw error;
     }
-    
-    return userId; // TypeScript knows this is string, not undefined
-  }
-
-  @Post()
-  async create(@Body() createPostDto: CreatePostDto, @Req() req: AuthRequest) {
-    const userId = this.getUserId(req);
-    return this.postService.create(createPostDto, userId);
   }
 
   @Get()
-  async findAll(@Req() req: AuthRequest) {
-    const userId = this.getUserId(req);
-    return this.postService.findAllByUser(userId);
+  async findAll(@Req() req) {
+    const tenantId = req.user.tenantId;
+    
+    if (!tenantId) {
+      throw new ForbiddenException('Access denied: No tenant ID found in token.');
+    }
+
+    console.log(`Fetching all posts for Tenant: ${tenantId}`);
+    return this.postService.findAllByTenant(tenantId);
   }
 
-  @Get('published')
-  async findPublished(@Req() req: AuthRequest) {
-    const userId = this.getUserId(req);
-    return this.postService.findPublishedByUser(userId);
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: AuthRequest) {
-    return this.postService.findOne(id);
-  }
-
-  @Put(':id')
+  @Patch(':id')
   async update(
-    @Param('id') id: string,
-    @Body() updatePostDto: UpdatePostDto,
-    @Req() req: AuthRequest,
+    @Param('id') id: string, 
+    @Body() updatePostDto: UpdatePostDto, 
+    @Req() req
   ) {
-    const userId = this.getUserId(req);
-    return this.postService.update(id, updatePostDto, userId);
+    const userId = req.user.sub || req.user.userId;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      throw new ForbiddenException('Access denied: Missing tenant context.');
+    }
+    
+    return this.postService.update(id, updatePostDto, userId, tenantId);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req: AuthRequest) {
-    const userId = this.getUserId(req);
-    return this.postService.remove(id, userId);
+  async remove(@Param('id') id: string, @Req() req) {
+    const userId = req.user.sub || req.user.userId;
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      throw new ForbiddenException('Access denied: Missing tenant context.');
+    }
+
+    return this.postService.remove(id, userId, tenantId);
   }
 }
