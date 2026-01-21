@@ -1,21 +1,28 @@
-// 
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const logger = new Logger()
+  const logger = new Logger();
 
   app.enableCors({
     origin: 'http://localhost:3000',
     credentials: true,
   });
-  const port = process.env.PORT || 4000
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  const port = process.env.PORT || 4000;
   console.log('MONGO_URI =', process.env.MONGO_URI);
+
   await app.listen(port);
-  logger.log(`server is listening on port${port}`)
-  
+  logger.log(`Server is listening on port ${port}`);
 }
 bootstrap();

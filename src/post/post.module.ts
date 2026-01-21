@@ -4,12 +4,14 @@ import { PostController } from './post.controller';
 import { PublicPostController } from './public-post.controller';
 import { PostService } from './post.service';
 import { Post, PostSchema } from './post.schema';
-import { TenantModule } from '../tenants/tenant.module';
+import { UsersModule } from '../users/users.module'; 
+import { AuthModule } from '../auth/auth.module'; 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
-    TenantModule, // Required for public controller
+    UsersModule,
+    AuthModule,
   ],
   controllers: [PostController, PublicPostController],
   providers: [PostService],

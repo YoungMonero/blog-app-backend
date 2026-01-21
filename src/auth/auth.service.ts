@@ -23,14 +23,12 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // ✅ Use "new this.userModel" so _id is generated immediately
     const user = new this.userModel({
       email: dto.email,
       username: dto.userName,
       passwordHash,
     });
 
-    // ✅ Now you can safely set tenantId using the generated _id
     user.tenantId = user._id.toString();
 
     await user.save();

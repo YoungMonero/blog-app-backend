@@ -29,6 +29,6 @@ export class BlogsController {
   @Get('me')
   async getMyBlog(@Req() req: AuthRequest) {
     const tenantId = req.user.tenantId;
-    return this.blogsService.getBlogByTenant(tenantId); // ✅ now matches service
+    return this.blogsService.getBlogByTenant(tenantId); 
   }
 }
