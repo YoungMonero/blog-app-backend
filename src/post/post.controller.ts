@@ -6,19 +6,20 @@ import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { HasBlogGuard } from '../common/guards/has-blog.guard'
 
 @Controller('posts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, HasBlogGuard)
 export class PostController {
 
   constructor(
     private readonly postService: PostService
   ) {}
  
-  @Post() 
+  @Post()
+  @UseGuards(JwtAuthGuard, HasBlogGuard)  
   async create(@Body() createPostDto: CreatePostDto, @Req() req) {
     try {
-      // 1. Extract values directly from the JWT (attached by JwtAuthGuard)
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
 
@@ -26,13 +27,12 @@ export class PostController {
       console.log('User ID:', userId);
       console.log('Tenant ID from Token:', tenantId);
 
-      // 2. Verification
+
       if (!tenantId) {
         console.error('ERROR: User token missing tenantId. User must re-login.');
         throw new ForbiddenException('No blog/tenant associated with this account payload.');
       }
 
-      // 3. Create Post linked to both the person (author) and the blog (tenant)
       return await this.postService.create(createPostDto, userId, tenantId);
     } catch (error) {
       console.error('Create Post Error:', error.message);
@@ -41,6 +41,7 @@ export class PostController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, HasBlogGuard) 
   async findAll(@Req() req) {
     const tenantId = req.user.tenantId;
     
@@ -53,6 +54,7 @@ export class PostController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, HasBlogGuard) 
   async update(
     @Param('id') id: string, 
     @Body() updatePostDto: UpdatePostDto, 
@@ -69,6 +71,7 @@ export class PostController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, HasBlogGuard) 
   async remove(@Param('id') id: string, @Req() req) {
     const userId = req.user.sub || req.user.userId;
     const tenantId = req.user.tenantId;

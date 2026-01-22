@@ -5,14 +5,24 @@ import { Document } from 'mongoose';
 export class Tenant extends Document {
   @Prop({ required: true })
   name: string;
+  
+  @Prop({ default: '' })
+  description: string;
 
   @Prop({ required: true, unique: true })
   slug: string;
 
-  @Prop({required: true})
+  @Prop({ required: true })
   userId: string;
 
   @Prop({ type: String, required: true })
   owner: string;
 }
+
 export const TenantSchema = SchemaFactory.createForClass(Tenant);
+
+
+export type TenantDocument = Tenant & Document & {
+  createdAt: Date;
+  updatedAt: Date;
+};

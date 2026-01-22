@@ -6,6 +6,7 @@ import { Post, PostDocument } from './post.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
+
 @Injectable()
 export class PostService {
   constructor(
@@ -84,5 +85,13 @@ export class PostService {
 
     if (!post) throw new NotFoundException('Post not found');
     return post;
+  }
+
+  async countByTenant(tenantId: string): Promise<number> {
+    return this.postModel
+      .countDocuments({ 
+        tenantId: new Types.ObjectId(tenantId) 
+      })
+      .exec();
   }
 }

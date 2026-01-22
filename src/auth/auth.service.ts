@@ -1,11 +1,12 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+// auth/auth.service.ts
+import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 import { User } from '../users/user.schema';
-import { Tenant } from '../tenants/tenant.schema'; 
+import { Tenant } from '../tenants/tenant.schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -13,107 +14,91 @@ import { LoginDto } from './dto/login.dto';
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Tenant.name) private tenantModel: Model<Tenant>, // This exists
+    @InjectModel(Tenant.name) private tenantModel: Model<Tenant>,
     private jwtService: JwtService,
   ) {}
 
   async register(dto: RegisterDto) {
-    const existingUser = await this.userModel.findOne({ email: dto.email });
-    if (existingUser) {
-      throw new BadRequestException('Email already in use');
-    }
+    // Check for existing email/username
+    const [existingEmail, existingUsername] = await Promise.all([
+      this.userModel.findOne({ email: dto.email }),
+      this.userModel.findOne({ username: dto.username }),
+    ]);
+
+    if (existingEmail) throw new ConflictException('Email already in use');
+    if (existingUsername) throw new ConflictException('Username already taken');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    // Create user as READER (no blog)
     const user = new this.userModel({
       email: dto.email,
       username: dto.username,
-      passwordHash
+      passwordHash,
+      role: 'reader', // Default role
+      // NO tenantId
     });
 
     await user.save();
 
-    const tenantSlug = dto.username.toLowerCase()
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/--+/g, '-');
-    
-    const tenant = new this.tenantModel({
-      name: `${dto.username}'s Blog`,
-      slug: tenantSlug,
-      owner: user._id.toString(),  
-      userId: user._id.toString(),
-    });
-
-    await tenant.save();
-
-  
-    user.tenantId = tenant._id.toString();
-    await user.save();
-
-
+    // Generate token WITHOUT tenantId
     const token = this.jwtService.sign({
       sub: user._id.toString(),
       userId: user._id.toString(),
-      tenantId: tenant._id.toString(),
       email: user.email,
+      username: user.username,
+      role: 'reader',
+      hasBlog: false, // Important!
     });
 
     return {
-      message: 'Registration successful',
+      message: 'Welcome! Start exploring blogs or create your own when ready.',
       accessToken: token,
       user: {
         id: user._id,
         email: user.email,
         username: user.username,
-        tenantId: tenant._id,
+        role: 'reader',
+        hasBlog: false,
       }
     };
   }
 
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ email: dto.email });
-    if (!user) {
-      throw new BadRequestException('Invalid credentials');
-    }
+    if (!user) throw new BadRequestException('Invalid credentials');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
-      throw new BadRequestException('Invalid credentials');
-    }
+    if (!valid) throw new BadRequestException('Invalid credentials');
 
-  
-    let tenant = await this.tenantModel.findOne({ 
-      $or: [
-        { owner: user._id.toString() },
-        { userId: user._id.toString() }
-      ]
+    // Check if user has a blog
+    const tenant = await this.tenantModel.findOne({
+      $or: [{ owner: user._id.toString() }, { userId: user._id.toString() }]
     });
 
-    if (!tenant) {
-      const tenantSlug = (user.username || user.email.split('@')[0])
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/--+/g, '-');
-      
-      tenant = new this.tenantModel({
-        name: `${user.username || 'My'}'s Blog`,
-        slug: tenantSlug,
-        owner: user._id.toString(),
-        userId: user._id.toString(),
-      });
-      await tenant.save();
-      
+    const hasBlog = !!tenant;
+    const role = hasBlog ? 'author' : 'reader';
 
-      user.tenantId = tenant._id.toString();
+    // Update user role if inconsistent
+    if (user.role !== role) {
+      user.role = role;
       await user.save();
     }
 
-    const token = this.jwtService.sign({
+    const tokenPayload: any = {
       sub: user._id.toString(),
       userId: user._id.toString(),
-      tenantId: tenant._id.toString(), 
       email: user.email,
-    });
+      username: user.username,
+      role,
+      hasBlog,
+    };
+
+    if (hasBlog && tenant) {
+      tokenPayload.tenantId = tenant._id.toString();
+    }
+
+    const token = this.jwtService.sign(tokenPayload);
 
     return {
       accessToken: token,
@@ -121,8 +106,30 @@ export class AuthService {
         id: user._id,
         email: user.email,
         username: user.username,
-        tenantId: tenant._id,
+        role,
+        hasBlog,
+        tenantId: tenant?._id,
       }
     };
+  }
+
+  // Helper to upgrade reader to author
+  async upgradeToAuthor(userId: string, tenantId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new BadRequestException('User not found');
+
+    user.role = 'author';
+    user.tenantId = tenantId;
+    await user.save();
+
+    return this.jwtService.sign({
+      sub: user._id.toString(),
+      userId: user._id.toString(),
+      email: user.email,
+      username: user.username,
+      role: 'author',
+      hasBlog: true,
+      tenantId,
+    });
   }
 }

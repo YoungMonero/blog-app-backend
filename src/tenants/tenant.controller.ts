@@ -1,24 +1,72 @@
-import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common';
-
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Controller, Post, Body, UseGuards, Req, Get, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantService } from './tenant.service';
 import { CreateTenantDto } from './tenant.dto';
 
 @Controller('tenants')
-@UseGuards(JwtAuthGuard)
 export class TenantController {
-  constructor(private tenantService: TenantService) {}
+  constructor(
+    private tenantService: TenantService,
+    private jwtService: JwtService,
+  ) {}
 
-  @Post()
-  create(
+  @Post('create')
+  @UseGuards(JwtAuthGuard)
+  async createBlog(
     @Body() dto: CreateTenantDto,
-    @Request() req,
+    @Req() req,
   ) {
-    return this.tenantService.createTenant(dto, req.user.userId);
+    const userId = req.user.userId || req.user.sub;
+
+    const existingBlog = await this.tenantService.findByOwner(userId);
+    if (existingBlog) {
+      throw new BadRequestException('You already have a blog!');
+    }
+
+    const existingSlug = await this.tenantService.findBySlug(dto.slug);
+    if (existingSlug) {
+      throw new BadRequestException(`Blog URL "${dto.slug}" is already taken`);
+    }
+
+    const blog = await this.tenantService.createTenant(dto, userId);
+
+    const newToken = this.jwtService.sign({
+      sub: req.user.sub,
+      userId: req.user.userId,
+      email: req.user.email,
+      username: req.user.username,
+      role: 'author',
+      hasBlog: true,
+      tenantId: blog._id.toString(),
+    });
+
+    return {
+      message: 'Blog created! You can now write posts.',
+      blog: {
+        id: blog._id,
+        name: blog.name,
+        slug: blog.slug,
+        description: blog.description,
+      },
+      accessToken: newToken,
+    };
   }
 
-  @Get('me')
-  getMyTenant(@Request() req) {
-    return this.tenantService.findByOwner(req.user.userId);
+  @Get('check')
+  @UseGuards(JwtAuthGuard)
+  async checkBlogStatus(@Req() req) {
+    const userId = req.user.userId || req.user.sub;
+    const blog = await this.tenantService.findByOwner(userId);
+
+    return {
+      hasBlog: !!blog,
+      blog: blog ? {
+        id: blog._id,
+        name: blog.name,
+        slug: blog.slug,
+      } : null,
+      canCreateBlog: !blog,
+    };
   }
 }
