@@ -9,10 +9,11 @@ export class Blog extends Document {
   @Prop({ required: true, unique: true })
   slug: string;
 
-  @Prop()
-  description?: string;
-
   @Prop({ required: true })
+  description: string;
+
+  // 👇 THIS IS IMPORTANT
+  @Prop({ required: true, unique: true })
   tenantId: string;
 }
 
