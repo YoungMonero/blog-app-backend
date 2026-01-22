@@ -15,8 +15,7 @@ export class CreateBlogDto {
   @IsString()
   @IsNotEmpty()
   title: string;
-
+  
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  description?: string;
 }

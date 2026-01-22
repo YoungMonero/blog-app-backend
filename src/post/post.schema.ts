@@ -1,18 +1,21 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
-@Schema({ timestamps: true })
-export class Post extends Document {
-  @Prop({ required: true })
-  tenantId: string;
+export type PostDocument = Post & Document;
 
-  @Prop({ required: true })
-  authorId: string;
+@Schema({ timestamps: true }) 
+export class Post {
+  @Prop({ type: Types.ObjectId, ref: 'Tenant', required: true, index: true })
+  tenantId: Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  authorId: Types.ObjectId; 
+
+  @Prop({ required: true, trim: true })
   title: string;
 
-  
+  @Prop({ required: true, trim: true })
+  slug: string; 
 
   @Prop({ required: true })
   content: string;
@@ -20,7 +23,7 @@ export class Post extends Document {
   @Prop()
   thumbnail?: string;
 
-  @Prop({ default: 'draft' })
+  @Prop({ default: 'draft', enum: ['draft', 'published'] })
   status: 'draft' | 'published';
 
   @Prop()
@@ -28,3 +31,5 @@ export class Post extends Document {
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
+
+PostSchema.index({ slug: 1, tenantId: 1 }, { unique: true });

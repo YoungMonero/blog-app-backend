@@ -81,8 +81,7 @@ export class BlogsService {
     });
   }
 
-  // ✅ Get current tenant's blog
-  async getBlogByTenant(tenantId: string) {
-    return this.blogModel.findOne({ tenantId });
+  async getBlogByTenant(tenantId: string): Promise<Blog | null> {
+    return this.blogModel.findOne({ tenantId }).exec();
   }
 }
