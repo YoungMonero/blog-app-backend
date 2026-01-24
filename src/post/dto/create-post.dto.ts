@@ -1,27 +1,37 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUrl } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUrl, MinLength, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
-
 
 export class CreatePostDto {
   @IsString()
   @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(200)
   title: string;
 
   @IsString()
   @IsOptional()
-  @Transform(({ value }) => value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))
+  @Transform(({ value, obj }) => {
+    if (!value && obj.title) {
+     
+      return obj.title
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+    }
+    return value?.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  })
   slug?: string;
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(10)
   content: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsUrl({ require_protocol: true }, { message: 'Thumbnail must be a valid URL' })
   thumbnail?: string;
 
   @IsOptional()
   @IsEnum(['draft', 'published'])
-  status?: 'draft' | 'published';
-
+  status?: 'draft' | 'published' = 'draft';
 }

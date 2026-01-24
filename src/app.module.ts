@@ -1,4 +1,3 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -9,6 +8,7 @@ import { PostController } from './post/post.controller';
 import { PostModule } from './post/post.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { UploadModule } from './uploads/upload.module';
+import { CommentsModule } from './comments/comments.module'
 
 
 @Module({
@@ -28,6 +28,7 @@ import { UploadModule } from './uploads/upload.module';
     PostModule,
     CloudinaryModule,
     UploadModule,
+    CommentsModule,
   ],
   controllers: [PostController],
 })

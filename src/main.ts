@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -20,7 +21,7 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT || 4000;
-  console.log('MONGO_URI =', process.env.MONGO_URI);
+  console.log('MONGO_URI =', process.env.MONGO_URI, );
 
   await app.listen(port);
   logger.log(`Server is listening on port ${port}`);

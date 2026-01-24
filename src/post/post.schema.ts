@@ -23,13 +23,29 @@ export class Post {
   @Prop()
   thumbnail?: string;
 
+  @Prop()
+  thumbnailPublicId?: string; // Store Cloudinary public ID for deletion
+
   @Prop({ default: 'draft', enum: ['draft', 'published'] })
   status: 'draft' | 'published';
 
-  @Prop()
+  @Prop({ type: Date })
   publishedAt?: Date;
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
 
 PostSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
+
+PostSchema.pre('save', function(next) {
+  const doc = this as any;
+  
+  if (doc.isModified('status') && doc.status === 'published' && !doc.publishedAt) {
+    doc.publishedAt = new Date();
+  }
+
+  if (doc.isModified('status') && doc.status === 'draft') {
+    doc.publishedAt = undefined;
+  }
+  
+});

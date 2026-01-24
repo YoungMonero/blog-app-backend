@@ -1,12 +1,12 @@
 import { Controller, Post, Get, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CommentsService } from './comments.service'; 
+import { CommentsService } from './comments.service';
 
-@Controller()
+@Controller('posts/:postId')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
-  @Post('posts/:postId/comments')
+  @Post('comments') 
   @UseGuards(JwtAuthGuard)
   async addComment(
     @Param('postId') postId: string,
@@ -25,12 +25,12 @@ export class CommentsController {
     });
   }
 
-  @Get('posts/:postId/comments')
+  @Get('comments')  
   async getComments(@Param('postId') postId: string) {
     return this.commentsService.findByPost(postId);
   }
 
-  @Post('posts/:postId/like')
+  @Post('like')  
   @UseGuards(JwtAuthGuard)
   async toggleLike(@Param('postId') postId: string, @Req() req) {
     const userId = req.user.sub || req.user.userId;

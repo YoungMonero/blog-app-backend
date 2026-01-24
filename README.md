@@ -1,3 +1,0 @@
-gmX9viPr43MF8ZxK
-ulrichkillian63_db_user
-mongodb+srv://ulrichkillian63_db_user:gmX9viPr43MF8ZxK@cluster0.up1hjlj.mongodb.net/

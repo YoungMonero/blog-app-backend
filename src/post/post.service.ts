@@ -1,97 +1,164 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import slugify from 'slugify';
 import { Post, PostDocument } from './post.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
-
 @Injectable()
 export class PostService {
   constructor(
-    @InjectModel(Post.name) private postModel: Model<PostDocument>
+    @InjectModel(Post.name) private postModel: Model<PostDocument>,
   ) {}
 
-  async create(dto: CreatePostDto, userId: string, tenantId: string): Promise<Post> {
-    const slug = slugify(dto.title, { lower: true, strict: true });
+  async create(
+    createPostDto: CreatePostDto, 
+    userId: string, 
+    tenantId: string
+  ): Promise<PostDocument> {
+    // Auto-generate slug if not provided
+    let slug = createPostDto.slug;
+    if (!slug) {
+      slug = createPostDto.title
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+    }
+
+    // Ensure slug is unique for this tenant
+    let uniqueSlug = slug;
+    let counter = 1;
     
+    while (await this.postModel.findOne({ 
+      slug: uniqueSlug, 
+      tenantId: new Types.ObjectId(tenantId) 
+    })) {
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
     const post = new this.postModel({
-      ...dto,
-      slug,
+      ...createPostDto,
+      slug: uniqueSlug,
       authorId: new Types.ObjectId(userId),
       tenantId: new Types.ObjectId(tenantId),
-      status: dto.status || 'draft',
-      publishedAt: dto.status === 'published' ? new Date() : null,
+      publishedAt: createPostDto.status === 'published' ? new Date() : undefined,
     });
 
     return post.save();
   }
 
-  async findAllByTenant(tenantId: string): Promise<Post[]> {
-    return this.postModel.find({ tenantId: new Types.ObjectId(tenantId) }).exec();
-  }
-
-  async update(id: string, dto: UpdatePostDto, userId: string, tenantId: string): Promise<Post> {
-    const post = await this.postModel.findOne({
-      _id: new Types.ObjectId(id),
-      tenantId: new Types.ObjectId(tenantId),
-      authorId: new Types.ObjectId(userId),
-    });
-
+  async update(
+    id: string, 
+    updatePostDto: UpdatePostDto, 
+    userId: string, 
+    tenantId: string
+  ): Promise<PostDocument> {
+    const post = await this.postModel.findById(id);
+    
     if (!post) {
-      throw new ForbiddenException('Post not found or you do not have permission to edit it');
+      throw new NotFoundException('Post not found');
     }
 
-    if (dto.title && dto.title !== post.title) {
-      post.slug = slugify(dto.title, { lower: true, strict: true });
+    // Check ownership
+    if (
+      post.authorId.toString() !== userId ||
+      post.tenantId.toString() !== tenantId
+    ) {
+      throw new ForbiddenException('You do not have permission to update this post');
     }
 
-    if (dto.status === 'published' && post.status !== 'published') {
-      post.publishedAt = new Date();
+    // Handle slug update if title changed
+    if (updatePostDto.title && updatePostDto.title !== post.title && !updatePostDto.slug) {
+      const newSlug = updatePostDto.title
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+      
+      // Make slug unique
+      let uniqueSlug = newSlug;
+      let counter = 1;
+      
+      while (await this.postModel.findOne({ 
+        slug: uniqueSlug, 
+        tenantId: post.tenantId,
+        _id: { $ne: id }
+      })) {
+        uniqueSlug = `${newSlug}-${counter}`;
+        counter++;
+      }
+      
+      updatePostDto.slug = uniqueSlug;
     }
 
-    Object.assign(post, dto);
-    return post.save();
-  }
+    const updatedPost = await this.postModel.findByIdAndUpdate(
+      id,
+      updatePostDto,
+      { new: true }
+    );
 
-  async remove(id: string, userId: string, tenantId: string): Promise<{ message: string }> {
-    const result = await this.postModel.deleteOne({
-      _id: new Types.ObjectId(id),
-      tenantId: new Types.ObjectId(tenantId),
-      authorId: new Types.ObjectId(userId),
-    });
-
-    if (result.deletedCount === 0) {
-      throw new ForbiddenException('Delete failed: Unauthorized or not found');
+    if (!updatedPost) {
+      throw new NotFoundException('Post not found after update');
     }
 
-    return { message: 'Post deleted successfully' };
+    return updatedPost;
   }
 
-  async findPublishedByTenant(tenantId: string): Promise<Post[]> {
-    return this.postModel.find({ 
-      tenantId: new Types.ObjectId(tenantId), 
-      status: 'published' 
-    }).exec();
-  }
-
-  async findBySlugAndTenant(slug: string, tenantId: string): Promise<Post> {
-    const post = await this.postModel.findOne({
-      slug,
-      tenantId: new Types.ObjectId(tenantId),
-      status: 'published'
-    }).exec();
-
-    if (!post) throw new NotFoundException('Post not found');
-    return post;
-  }
-
-  async countByTenant(tenantId: string): Promise<number> {
+  async findAllByTenant(tenantId: string): Promise<PostDocument[]> {
     return this.postModel
-      .countDocuments({ 
-        tenantId: new Types.ObjectId(tenantId) 
-      })
+      .find({ tenantId: new Types.ObjectId(tenantId) })
+      .sort({ createdAt: -1 })
+      .populate('authorId', 'username email profilePicture')
       .exec();
+  }
+
+  async findPublishedByTenant(tenantId: string): Promise<PostDocument[]> {
+    return this.postModel
+      .find({ 
+        tenantId: new Types.ObjectId(tenantId), 
+        status: 'published' 
+      })
+      .sort({ publishedAt: -1 })
+      .populate('authorId', 'username email profilePicture')
+      .exec();
+  }
+
+  async findBySlugAndTenant(slug: string, tenantId: string): Promise<PostDocument | null> {
+    return this.postModel
+      .findOne({ 
+        slug, 
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published'
+      })
+      .populate('authorId', 'username email profilePicture')
+      .exec();
+  }
+
+  async findOne(id: string): Promise<PostDocument | null> {
+    if (!Types.ObjectId.isValid(id)) {
+      return null;
+    }
+    return this.postModel
+      .findById(id)
+      .populate('authorId', 'username email profilePicture')
+      .exec();
+  }
+
+  async remove(id: string, userId: string, tenantId: string): Promise<void> {
+    const post = await this.postModel.findById(id);
+    
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    // Check ownership
+    if (
+      post.authorId.toString() !== userId ||
+      post.tenantId.toString() !== tenantId
+    ) {
+      throw new ForbiddenException('You do not have permission to delete this post');
+    }
+
+    await this.postModel.deleteOne({ _id: id });
   }
 }
