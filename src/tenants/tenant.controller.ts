@@ -1,4 +1,14 @@
-import { Controller, Post, Body, UseGuards, Req, Get, BadRequestException } from '@nestjs/common';
+import { 
+  Controller, 
+  Post, 
+  Body, 
+  UseGuards, 
+  Req, 
+  Get, 
+  BadRequestException, 
+  Param, 
+  NotFoundException 
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantService } from './tenant.service';
@@ -10,6 +20,27 @@ export class TenantController {
     private tenantService: TenantService,
     private jwtService: JwtService,
   ) {}
+
+  @Get('slug/:slug')
+  @UseGuards(JwtAuthGuard)
+  async getBySlug(@Param('slug') slug: string) {
+    const blog = await this.tenantService.findBySlug(slug);
+
+    if (!blog) {
+      throw new NotFoundException(`Blog with URL "${slug}" not found`);
+    }
+
+    return {
+      blog: {
+        id: blog._id,
+        title: blog.name,
+        slug: blog.slug,
+        description: blog.description,
+        // .toISOString() ensures it's a string for the frontend
+        createdAt: (blog as any).createdAt, 
+      },
+    };
+  }
 
   @Post('create')
   @UseGuards(JwtAuthGuard)

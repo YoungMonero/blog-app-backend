@@ -56,7 +56,9 @@ export class TenantService {
   }
 
   async findBySlug(slug: string): Promise<Tenant | null> {
-    return this.tenantModel.findOne({ slug }).exec();
+    return this.tenantModel.findOne({ 
+    slug: { $regex: new RegExp(`^${slug}$`, 'i') } 
+  }).exec();
   }
 
   async findById(id: string): Promise<Tenant | null> {
