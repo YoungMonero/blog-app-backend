@@ -16,7 +16,7 @@ export class PostService {
     userId: string, 
     tenantId: string
   ): Promise<PostDocument> {
-    // Auto-generate slug if not provided
+
     let slug = createPostDto.slug;
     if (!slug) {
       slug = createPostDto.title
@@ -37,9 +37,30 @@ export class PostService {
       counter++;
     }
 
+    // Auto-generate excerpt if not provided
+    let excerpt = createPostDto.excerpt;
+    if (!excerpt) {
+      excerpt = createPostDto.content
+        .substring(0, 200)
+        .replace(/<[^>]*>/g, '')
+        .trim();
+    }
+
+    // Auto-generate SEO description if not provided
+    let seoDescription = createPostDto.seoDescription;
+    if (!seoDescription) {
+      seoDescription = createPostDto.content
+        .substring(0, 160)
+        .replace(/<[^>]*>/g, '')
+        .trim();
+    }
+
     const post = new this.postModel({
       ...createPostDto,
       slug: uniqueSlug,
+      excerpt,
+      seoDescription,
+      tags: createPostDto.tags || [],
       authorId: new Types.ObjectId(userId),
       tenantId: new Types.ObjectId(tenantId),
       publishedAt: createPostDto.status === 'published' ? new Date() : undefined,
@@ -91,6 +112,22 @@ export class PostService {
       updatePostDto.slug = uniqueSlug;
     }
 
+    // Auto-generate excerpt if content is updated
+    if (updatePostDto.content && !updatePostDto.excerpt) {
+      updatePostDto.excerpt = updatePostDto.content
+        .substring(0, 200)
+        .replace(/<[^>]*>/g, '')
+        .trim();
+    }
+
+    // Auto-generate SEO description if content is updated
+    if (updatePostDto.content && !updatePostDto.seoDescription) {
+      updatePostDto.seoDescription = updatePostDto.content
+        .substring(0, 160)
+        .replace(/<[^>]*>/g, '')
+        .trim();
+    }
+
     const updatedPost = await this.postModel.findByIdAndUpdate(
       id,
       updatePostDto,
@@ -112,14 +149,26 @@ export class PostService {
       .exec();
   }
 
-  async findPublishedByTenant(tenantId: string): Promise<PostDocument[]> {
+  async findPublishedByTenant(tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
     return this.postModel
       .find({ 
         tenantId: new Types.ObjectId(tenantId), 
         status: 'published' 
       })
       .sort({ publishedAt: -1 })
-      .populate('authorId', 'username email profilePicture')
+      .skip(skip)
+      .limit(limit)
+      .populate('authorId', 'username email profilePicture displayName bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async countPublishedByTenant(tenantId: string): Promise<number> {
+    return this.postModel
+      .countDocuments({ 
+        tenantId: new Types.ObjectId(tenantId), 
+        status: 'published' 
+      })
       .exec();
   }
 
@@ -130,7 +179,100 @@ export class PostService {
         tenantId: new Types.ObjectId(tenantId),
         status: 'published'
       })
-      .populate('authorId', 'username email profilePicture')
+      .populate('authorId', 'username email profilePicture displayName bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async getTagsByTenant(tenantId: string): Promise<string[]> {
+    const result = await this.postModel
+      .aggregate([
+        {
+          $match: {
+            tenantId: new Types.ObjectId(tenantId),
+            status: 'published',
+            tags: { $exists: true, $not: { $size: 0 } }
+          }
+        },
+        {
+          $unwind: '$tags'
+        },
+        {
+          $group: {
+            _id: '$tags',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { count: -1 }
+        }
+      ])
+      .exec();
+
+    return result.map(item => item._id);
+  }
+
+  async findByTag(tag: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
+    return this.postModel
+      .find({
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published',
+        tags: tag
+      })
+      .sort({ publishedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('authorId', 'username email profilePicture displayName bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async countByTag(tag: string, tenantId: string): Promise<number> {
+    return this.postModel
+      .countDocuments({
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published',
+        tags: tag
+      })
+      .exec();
+  }
+
+  async search(query: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
+    const searchRegex = new RegExp(query, 'i');
+    return this.postModel
+      .find({
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published',
+        $or: [
+          { title: searchRegex },
+          { content: searchRegex },
+          { excerpt: searchRegex },
+          { seoDescription: searchRegex },
+          { tags: { $in: [searchRegex] } }
+        ]
+      })
+      .sort({ publishedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('authorId', 'username email profilePicture displayName bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async searchCount(query: string, tenantId: string): Promise<number> {
+    const searchRegex = new RegExp(query, 'i');
+    return this.postModel
+      .countDocuments({
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published',
+        $or: [
+          { title: searchRegex },
+          { content: searchRegex },
+          { excerpt: searchRegex },
+          { seoDescription: searchRegex },
+          { tags: { $in: [searchRegex] } }
+        ]
+      })
       .exec();
   }
 

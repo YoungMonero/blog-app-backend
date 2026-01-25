@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUrl, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUrl, MinLength, MaxLength, IsArray } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreatePostDto {
@@ -30,6 +30,23 @@ export class CreatePostDto {
   @IsOptional()
   @IsUrl({ require_protocol: true }, { message: 'Thumbnail must be a valid URL' })
   thumbnail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  excerpt?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MinLength(20)
+  @MaxLength(160)
+  seoDescription?: string;
 
   @IsOptional()
   @IsEnum(['draft', 'published'])

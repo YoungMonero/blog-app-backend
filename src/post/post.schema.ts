@@ -23,6 +23,15 @@ export class Post {
   @Prop()
   thumbnail?: string;
 
+  @Prop({ trim: true, minlength: 10, maxlength: 500 })
+  excerpt?: string;
+
+  @Prop({ type: [String], default: [] })
+  tags?: string[];  
+
+  @Prop({ trim: true, minlength: 20, maxlength: 160 })
+  seoDescription?: string;
+
   @Prop()
   thumbnailPublicId?: string; 
 
@@ -36,6 +45,9 @@ export class Post {
 export const PostSchema = SchemaFactory.createForClass(Post);
 
 PostSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
+PostSchema.index({ tags: 1 });
+PostSchema.index({ status: 1, tenantId: 1 });
+PostSchema.index({ authorId: 1, tenantId: 1 });
 
 PostSchema.pre('save', function(next) {
   const doc = this as any;

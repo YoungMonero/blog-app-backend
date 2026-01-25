@@ -45,6 +45,19 @@ export class PostController {
       if (!createPostDto.title || !createPostDto.content) {
         throw new BadRequestException('Title and content are required');
       }
+
+      // Validate optional fields if provided
+      if (createPostDto.tags && !Array.isArray(createPostDto.tags)) {
+        throw new BadRequestException('Tags must be an array');
+      }
+      
+      if (createPostDto.excerpt && createPostDto.excerpt.length < 10) {
+        throw new BadRequestException('Excerpt must be at least 10 characters');
+      }
+      
+      if (createPostDto.seoDescription && (createPostDto.seoDescription.length < 20 || createPostDto.seoDescription.length > 160)) {
+        throw new BadRequestException('SEO description must be between 20 and 160 characters');
+      }
       
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
@@ -76,8 +89,11 @@ export class PostController {
       const postData = {
         ...createPostDto,
         thumbnail: thumbnailUrl,
-        thumbnailPublicId
+        thumbnailPublicId,
+        tags: createPostDto.tags || [],
       };
+
+      this.logger.log(`Post data: excerpt=${createPostDto.excerpt}, tags=${JSON.stringify(createPostDto.tags)}, seoDescription=${createPostDto.seoDescription}`);
 
       const result = await this.postService.create(postData, userId, tenantId);
       this.logger.log(`Post created successfully: ${result._id}`);
@@ -111,6 +127,19 @@ export class PostController {
   ) {
     try {
       this.logger.log(`Updating post: ${id}`);
+      
+      // Validate optional fields if provided
+      if (updatePostDto.tags && !Array.isArray(updatePostDto.tags)) {
+        throw new BadRequestException('Tags must be an array');
+      }
+      
+      if (updatePostDto.excerpt && updatePostDto.excerpt.length < 10) {
+        throw new BadRequestException('Excerpt must be at least 10 characters');
+      }
+      
+      if (updatePostDto.seoDescription && (updatePostDto.seoDescription.length < 20 || updatePostDto.seoDescription.length > 160)) {
+        throw new BadRequestException('SEO description must be between 20 and 160 characters');
+      }
       
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
@@ -171,6 +200,8 @@ export class PostController {
         thumbnail: thumbnailUrl,
         thumbnailPublicId
       };
+
+      this.logger.log(`Post update data: excerpt=${updatePostDto.excerpt}, tags=${JSON.stringify(updatePostDto.tags)}, seoDescription=${updatePostDto.seoDescription}`);
 
       const result = await this.postService.update(id, updateData, userId, tenantId);
       this.logger.log(`Post updated successfully: ${id}`);
