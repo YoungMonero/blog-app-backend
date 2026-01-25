@@ -1,9 +1,11 @@
-// src/auth/auth.service.ts
+
+
 import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import slugify from 'slugify';
 
 import { User } from '../users/user.schema';
 import { Tenant } from '../tenants/tenant.schema';
@@ -18,9 +20,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  // ✅ Register new user + tenant
   async register(dto: RegisterDto) {
-    // Check for existing email/username
     const [existingEmail, existingUsername] = await Promise.all([
       this.userModel.findOne({ email: dto.email }),
       this.userModel.findOne({ username: dto.username }),
@@ -40,21 +40,22 @@ export class AuthService {
     });
     await user.save();
 
-    // Create tenant (all required fields)
+    // Create tenant (safe slug)
+    const tenantName = dto.username;
+    const tenantSlug = slugify(tenantName, { lower: true, strict: true });
+
     const tenant = new this.tenantModel({
       owner: user._id.toString(),
       userId: user._id.toString(),
-      name: dto.username, // 👈 required
-      slug: dto.username, // 👈 required
+      name: tenantName,
+      slug: tenantSlug,
     });
     await tenant.save();
 
-    // Attach tenantId to user
     user.tenantId = tenant._id.toString();
     await user.save();
 
-    // Generate token WITH tenantId
-    const token = this.jwtService.sign({
+    const tokenPayload = {
       sub: user._id.toString(),
       userId: user._id.toString(),
       email: user.email,
@@ -62,13 +63,16 @@ export class AuthService {
       role: 'author',
       hasBlog: true,
       tenantId: tenant._id.toString(),
-    });
+    };
+
+    const token = this.jwtService.sign(tokenPayload);
 
     return {
       message: 'Welcome! Your blog tenant has been created.',
       accessToken: token,
       user: {
         id: user._id,
+        userId: user._id.toString(),
         email: user.email,
         username: user.username,
         role: 'author',
@@ -78,7 +82,6 @@ export class AuthService {
     };
   }
 
-  // ✅ Login existing user
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ email: dto.email });
     if (!user) throw new BadRequestException('Invalid credentials');
@@ -91,13 +94,16 @@ export class AuthService {
       $or: [{ owner: user._id.toString() }, { userId: user._id.toString() }],
     });
 
-    // If tenant missing, auto-create one
+    // If tenant missing, auto-create one with safe fallback
     if (!tenant) {
+      const tenantName = user.username || user.email.split('@')[0];
+      const tenantSlug = slugify(tenantName, { lower: true, strict: true });
+
       tenant = new this.tenantModel({
         owner: user._id.toString(),
         userId: user._id.toString(),
-        name: user.username,
-        slug: user.username,
+        name: tenantName,
+        slug: tenantSlug,
       });
       await tenant.save();
 
@@ -109,7 +115,7 @@ export class AuthService {
     const hasBlog = true;
     const role = 'author';
 
-    const tokenPayload: any = {
+    const tokenPayload = {
       sub: user._id.toString(),
       userId: user._id.toString(),
       email: user.email,
@@ -125,6 +131,7 @@ export class AuthService {
       accessToken: token,
       user: {
         id: user._id,
+        userId: user._id.toString(),
         email: user.email,
         username: user.username,
         role,
@@ -134,7 +141,6 @@ export class AuthService {
     };
   }
 
-  // ✅ Upgrade reader to author
   async upgradeToAuthor(userId: string, tenantId: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new BadRequestException('User not found');
@@ -143,7 +149,7 @@ export class AuthService {
     user.tenantId = tenantId;
     await user.save();
 
-    return this.jwtService.sign({
+    const tokenPayload = {
       sub: user._id.toString(),
       userId: user._id.toString(),
       email: user.email,
@@ -151,6 +157,8 @@ export class AuthService {
       role: 'author',
       hasBlog: true,
       tenantId,
-    });
+    };
+
+    return this.jwtService.sign(tokenPayload);
   }
 }
