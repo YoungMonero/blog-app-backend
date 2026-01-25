@@ -24,7 +24,7 @@ export class Post {
   thumbnail?: string;
 
   @Prop()
-  thumbnailPublicId?: string; // Store Cloudinary public ID for deletion
+  thumbnailPublicId?: string; 
 
   @Prop({ default: 'draft', enum: ['draft', 'published'] })
   status: 'draft' | 'published';

@@ -9,7 +9,7 @@ import { PostModule } from './post/post.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { UploadModule } from './uploads/upload.module';
 import { CommentsModule } from './comments/comments.module'
-
+import {  UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -29,6 +29,7 @@ import { CommentsModule } from './comments/comments.module'
     CloudinaryModule,
     UploadModule,
     CommentsModule,
+    UsersModule,
   ],
   controllers: [PostController],
 })
