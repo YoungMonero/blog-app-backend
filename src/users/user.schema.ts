@@ -17,6 +17,28 @@ export class User extends Document {
 
   @Prop({ required: false })
   tenantId?: string;
+
+  @Prop()
+createdAt?: Date;
+
+@Prop()
+updatedAt?: Date;
+
+  @Prop({ default: '' })
+  bio?: string;
+
+  @Prop()
+  profilePicture?: string;
+
+  @Prop()
+  profilePicturePublicId?: string;
+
+  @Prop()
+  displayName?: string;
+
+  @Prop()
+  lastLoginAt?: Date;
 }
 
+export type UserDocument = User & Document;
 export const UserSchema = SchemaFactory.createForClass(User);
