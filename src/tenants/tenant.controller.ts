@@ -33,11 +33,10 @@ export class TenantController {
 
     const blog = await this.tenantService.createTenant(dto, userId);
 
-    // Persist tenantId to the user record so future tokens can include it
+
     try {
       await this.usersService.updateTenant(userId, blog._id.toString());
     } catch (err) {
-      // Log but continue to issue token
     }
 
     const newToken = this.jwtService.sign({
