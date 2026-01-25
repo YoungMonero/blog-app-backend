@@ -1,4 +1,3 @@
-
 import {
   Controller,
   Post,
@@ -6,6 +5,7 @@ import {
   Body,
   Req,
   UseGuards,
+  Param,
 } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -14,28 +14,28 @@ import { CreateBlogDto } from './dto/create-blog.dto';
 import type { AuthRequest } from 'src/auth/type/auth-request.type';
 
 @Controller('blogs')
-@UseGuards(JwtAuthGuard)
 export class BlogsController {
   constructor(private readonly blogsService: BlogsService) {}
 
+  @Get('slug/:slug')
+  async getBlogBySlug(@Param('slug') slug: string) {
+    return await this.blogsService.getBlogBySlug(slug);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post()
   async createBlog(@Body() body: CreateBlogDto, @Req() req: AuthRequest) {
     const tenantId = req.user.tenantId;
     const authorId = req.user.userId;
-    // ✅ Let service handle exceptions properly
     return await this.blogsService.createBlog(body, tenantId, authorId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMyBlog(@Req() req: AuthRequest) {
     const tenantId = req.user.tenantId;
     const blog = await this.blogsService.getBlogByTenant(tenantId);
-
-    // ✅ Always return JSON, even if no blog exists
-    if (!blog) {
-      return { blog: null };
-    }
-
+    if (!blog) return { blog: null };
     return { blog };
   }
 }

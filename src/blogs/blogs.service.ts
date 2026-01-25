@@ -1,6 +1,6 @@
 
 
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import slugify from 'slugify';
@@ -51,6 +51,14 @@ export class BlogsService {
       console.error('Error creating blog:', error);
       throw new InternalServerErrorException('Failed to create blog');
     }
+  }
+
+  async getBlogBySlug(slug: string): Promise<Blog | null> {
+  const blog = await this.blogModel.findOne({ slug }).exec();
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+  return blog;
   }
 
   async getBlogByTenant(tenantId: string): Promise<Blog | null> {
