@@ -46,7 +46,7 @@ export class PostService {
         .trim();
     }
 
-    // Auto-generate SEO description if not provided
+
     let seoDescription = createPostDto.seoDescription;
     if (!seoDescription) {
       seoDescription = createPostDto.content

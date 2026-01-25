@@ -12,7 +12,6 @@ export class CreatePostDto {
   @IsOptional()
   @Transform(({ value, obj }) => {
     if (!value && obj.title) {
-     
       return obj.title
         .toLowerCase()
         .replace(/\s+/g, '-')
@@ -28,12 +27,21 @@ export class CreatePostDto {
   content: string;
 
   @IsOptional()
-  @IsUrl({ require_protocol: true }, { message: 'Thumbnail must be a valid URL' })
+  @Transform(({ value }) => {
+  
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    return value;
+  })
+  @IsUrl({ require_protocol: true }, { 
+    message: 'Thumbnail must be a valid URL (or upload a picture from your gallery)'
+  })
   thumbnail?: string;
 
   @IsOptional()
   @IsString()
-  @MinLength(10)
+  @MinLength(10, { message: 'Excerpt must be at least 10 characters long' })
   @MaxLength(500)
   excerpt?: string;
 

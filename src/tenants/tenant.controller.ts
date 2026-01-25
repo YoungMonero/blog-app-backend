@@ -1,14 +1,16 @@
-import { Controller, Post, Body, UseGuards, Req, Get, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Get, BadRequestException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantService } from './tenant.service';
 import { CreateTenantDto } from './tenant.dto';
+import { UsersService } from '../users/users.service';
 
 @Controller('tenants')
 export class TenantController {
   constructor(
     private tenantService: TenantService,
     private jwtService: JwtService,
+    @Inject(UsersService) private usersService: UsersService,
   ) {}
 
   @Post('create')
@@ -30,6 +32,12 @@ export class TenantController {
     }
 
     const blog = await this.tenantService.createTenant(dto, userId);
+
+
+    try {
+      await this.usersService.updateTenant(userId, blog._id.toString());
+    } catch (err) {
+    }
 
     const newToken = this.jwtService.sign({
       sub: req.user.sub,
