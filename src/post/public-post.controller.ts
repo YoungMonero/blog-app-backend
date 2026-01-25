@@ -41,7 +41,7 @@ export class PublicPostController {
       owner: tenant.owner // This should be populated if your tenant schema has owner reference
     };
     
-    // Get posts with pagination
+   
     const skip = (page - 1) * limit;
     const [posts, total] = await Promise.all([
       this.postService.findPublishedByTenant(tenant._id.toString(), skip, limit),
