@@ -29,7 +29,7 @@ export class PublicPostController {
       throw new NotFoundException('Blog not found');
     }
     
-    // Get blog info
+
     const blogInfo = {
       id: tenant._id,
       name: tenant.name,
