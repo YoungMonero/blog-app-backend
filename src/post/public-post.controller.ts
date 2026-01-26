@@ -279,7 +279,7 @@ export class PublicPostController {
       slug: post.slug,
       excerpt: post.excerpt,
       content: post.content,
-      thumbnail: post.thumbnail,
+      thumbnail: post.thumbnail || null,
       tags: post.tags || [],
       seoDescription: post.seoDescription,
       author: {

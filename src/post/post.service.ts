@@ -324,4 +324,43 @@ export class PostService {
 
     await this.postModel.deleteOne({ _id: id });
   }
+
+  async findTestPosts(): Promise<PostDocument[]> {
+    const testPattern = /test/i; // Case-insensitive match for "test"
+    return this.postModel
+      .find({
+        $or: [
+          { title: { $regex: testPattern } },
+          { slug: { $regex: testPattern } },
+          { content: { $regex: testPattern, $options: 'i' } }
+        ]
+      })
+      .populate('authorId', 'username email')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async removeTestPosts(): Promise<{ deletedCount: number; deletedPosts: any[] }> {
+    const testPosts = await this.findTestPosts();
+    const deletedPosts = testPosts.map(post => ({
+      id: post._id.toString(),
+      title: post.title,
+      slug: post.slug,
+      tenantId: post.tenantId
+    }));
+
+    const testPattern = /test/i;
+    const result = await this.postModel.deleteMany({
+      $or: [
+        { title: { $regex: testPattern } },
+        { slug: { $regex: testPattern } },
+        { content: { $regex: testPattern, $options: 'i' } }
+      ]
+    });
+
+    return {
+      deletedCount: result.deletedCount || 0,
+      deletedPosts
+    };
+  }
 }
