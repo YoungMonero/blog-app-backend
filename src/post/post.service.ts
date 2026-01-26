@@ -172,6 +172,27 @@ export class PostService {
       .exec();
   }
 
+  async findAllPublished(skip = 0, limit = 10): Promise<PostDocument[]> {
+    return this.postModel
+      .find({ 
+        status: 'published' 
+      })
+      .sort({ publishedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('authorId', 'username email profilePicture displayName bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async countAllPublished(): Promise<number> {
+    return this.postModel
+      .countDocuments({ 
+        status: 'published' 
+      })
+      .exec();
+  }
+
   async findBySlugAndTenant(slug: string, tenantId: string): Promise<PostDocument | null> {
     return this.postModel
       .findOne({ 
