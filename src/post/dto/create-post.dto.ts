@@ -58,5 +58,5 @@ export class CreatePostDto {
 
   @IsOptional()
   @IsEnum(['draft', 'published'])
-  status?: 'draft' | 'published' = 'draft';
+  status?: 'draft' | 'published' = 'published';
 }
