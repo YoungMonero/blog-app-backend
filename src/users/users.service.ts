@@ -79,7 +79,6 @@ export class UsersService {
       profilePicture: user.profilePicture,
       role: user.role,
       hasBlog: !!user.tenantId,
-      createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
     };
   }

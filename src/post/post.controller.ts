@@ -32,7 +32,7 @@ export class PostController {
         fileIsRequired: false,
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif|webp)$/ }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|gif|webp)$/ }),
         ],
       })
     ) file?: Express.Multer.File
@@ -85,18 +85,36 @@ export class PostController {
         }
       }
 
-      // Create post with or without thumbnail
-      const postData = {
-        ...createPostDto,
-        thumbnail: thumbnailUrl,
-        thumbnailPublicId,
+      // Create post with explicit thumbnail field - ensure it's always included
+      // Using a more explicit approach to ensure fields are passed
+      const postData: any = {
+        title: createPostDto.title,
+        content: createPostDto.content,
+        slug: createPostDto.slug,
+        excerpt: createPostDto.excerpt,
         tags: createPostDto.tags || [],
+        seoDescription: createPostDto.seoDescription,
+        status: createPostDto.status ?? 'published',
+        // Explicitly include thumbnail fields - very important!
+        thumbnail: thumbnailUrl ?? createPostDto.thumbnail ?? null,
+        thumbnailPublicId: thumbnailPublicId ?? undefined,
       };
 
-      this.logger.log(`Post data: excerpt=${createPostDto.excerpt}, tags=${JSON.stringify(createPostDto.tags)}, seoDescription=${createPostDto.seoDescription}`);
+      // Debug logging
+      this.logger.log(`Post data to save: ${JSON.stringify({
+        title: postData.title,
+        hasThumbnail: !!postData.thumbnail,
+        thumbnail: postData.thumbnail,
+        thumbnailPublicId: postData.thumbnailPublicId,
+        thumbnailFieldExists: 'thumbnail' in postData
+      })}`);
 
       const result = await this.postService.create(postData, userId, tenantId);
+      
+      // Log what was actually saved
       this.logger.log(`Post created successfully: ${result._id}`);
+      this.logger.log(`Saved post thumbnail: ${result.thumbnail}`);
+      this.logger.log(`Has thumbnail field in saved document: ${'thumbnail' in result}`);
       
       return {
         success: true,
@@ -120,7 +138,7 @@ export class PostController {
         fileIsRequired: false,
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif|webp)$/ }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|gif|webp)$/ }),
         ],
       })
     ) file?: Express.Multer.File
@@ -154,8 +172,8 @@ export class PostController {
         throw new NotFoundException('Post not found');
       }
 
-      let thumbnailUrl = updatePostDto.thumbnail;
-      let thumbnailPublicId = currentPost.thumbnailPublicId;
+      let thumbnailUrl: string | null | undefined = updatePostDto.thumbnail;
+      let thumbnailPublicId: string | null | undefined = currentPost.thumbnailPublicId;
 
       // Handle file upload if present
       if (file) {
@@ -182,7 +200,7 @@ export class PostController {
           throw new BadRequestException(`Thumbnail upload failed: ${uploadError.message}`);
         }
       } else if (updatePostDto.thumbnail === null || updatePostDto.thumbnail === '') {
-        // If thumbnail is being removed via form-data (empty string)
+
         if (currentPost.thumbnailPublicId) {
           try {
             await this.cloudinaryService.deleteImage(currentPost.thumbnailPublicId);
@@ -191,17 +209,41 @@ export class PostController {
             this.logger.warn(`Failed to delete thumbnail: ${deleteError.message}`);
           }
         }
-        thumbnailUrl = undefined;
-        thumbnailPublicId = undefined;
+        thumbnailUrl = null;
+        thumbnailPublicId = null;
+      } else if (updatePostDto.thumbnail === undefined) {
+        // If thumbnail is not being modified, keep the existing value
+        thumbnailUrl = currentPost.thumbnail;
+        thumbnailPublicId = currentPost.thumbnailPublicId;
+      } else {
+        // Thumbnail URL was provided explicitly (not uploaded). Clear publicId unless explicitly provided.
+        thumbnailPublicId = updatePostDto.thumbnailPublicId ?? null;
       }
       
-      const updateData = {
-        ...updatePostDto,
+      // Create update data with explicit thumbnail field
+      const updateData: any = {
+        title: updatePostDto.title,
+        content: updatePostDto.content,
+        slug: updatePostDto.slug,
+        excerpt: updatePostDto.excerpt,
+        tags: updatePostDto.tags,
+        seoDescription: updatePostDto.seoDescription,
+        status: updatePostDto.status,
+        // Explicitly include thumbnail fields
         thumbnail: thumbnailUrl,
-        thumbnailPublicId
+        thumbnailPublicId: thumbnailPublicId,
       };
 
-      this.logger.log(`Post update data: excerpt=${updatePostDto.excerpt}, tags=${JSON.stringify(updatePostDto.tags)}, seoDescription=${updatePostDto.seoDescription}`);
+      // Remove undefined values to avoid overwriting with undefined
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+
+      this.logger.log(`Post update data: ${JSON.stringify(updateData)}`);
+      this.logger.log(`Thumbnail in update: ${updateData.thumbnail}`);
+      this.logger.log(`Has thumbnail field in update: ${'thumbnail' in updateData}`);
 
       const result = await this.postService.update(id, updateData, userId, tenantId);
       this.logger.log(`Post updated successfully: ${id}`);

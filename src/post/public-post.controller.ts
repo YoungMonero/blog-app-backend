@@ -14,6 +14,86 @@ export class PublicPostController {
     private readonly tenantService: TenantService,
   ) {}
 
+  @Get()
+  async getAllPublicPosts(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10
+  ) {
+    this.logger.log('Fetching all published posts');
+    
+    const skip = (page - 1) * limit;
+    const [posts, total] = await Promise.all([
+      this.postService.findAllPublished(skip, limit),
+      this.postService.countAllPublished()
+    ]);
+    
+    this.logger.log(`Found ${posts.length} published posts`);
+    
+    return {
+      success: true,
+      data: {
+        posts: posts.map(post => this.transformPost(post)),
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit)
+        }
+      }
+    };
+  }
+
+  @Get('tenant/:tenantId')
+  async getPostsByTenantId(
+    @Param('tenantId') tenantId: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10
+  ) {
+    this.logger.log(`Fetching published posts for tenant ID: ${tenantId}`);
+    
+    if (!tenantId || tenantId.trim() === '') {
+      throw new BadRequestException('Tenant ID is required');
+    }
+    
+    const tenant = await this.tenantService.findById(tenantId);
+    if (!tenant) {
+      this.logger.warn(`Tenant not found for ID: ${tenantId}`);
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const blogInfo = {
+      id: tenant._id,
+      name: tenant.name,
+      slug: tenant.slug,
+      description: tenant.description,
+      logo: tenant.logo,
+      coverImage: tenant.coverImage,
+      createdAt: tenant.createdAt,
+      owner: tenant.owner 
+    };
+    
+    const skip = (page - 1) * limit;
+    const [posts, total] = await Promise.all([
+      this.postService.findPublishedByTenant(tenantId, skip, limit),
+      this.postService.countPublishedByTenant(tenantId)
+    ]);
+    
+    this.logger.log(`Found ${posts.length} published posts for tenant ID: ${tenantId}`);
+    
+    return {
+      success: true,
+      data: {
+        blog: blogInfo,
+        posts: posts.map(post => this.transformPost(post)),
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit)
+        }
+      }
+    };
+  }
 
   @Get(':tenantSlug/tags')
   async getTenantTags(@Param('tenantSlug') tenantSlug: string) {
@@ -199,7 +279,8 @@ export class PublicPostController {
       slug: post.slug,
       excerpt: post.excerpt,
       content: post.content,
-      thumbnail: post.thumbnail,
+      thumbnail: post.thumbnail || undefined,
+      thumbnailPublicId: post.thumbnailPublicId || undefined, 
       tags: post.tags || [],
       seoDescription: post.seoDescription,
       author: {

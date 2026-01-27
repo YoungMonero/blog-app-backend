@@ -20,8 +20,8 @@ export class Post {
   @Prop({ required: true })
   content: string;
 
-  @Prop()
-  thumbnail?: string;
+  @Prop({ type: String, default: null })
+  thumbnail?: string | null;
 
   @Prop({ trim: true, minlength: 10, maxlength: 500 })
   excerpt?: string;
@@ -32,7 +32,7 @@ export class Post {
   @Prop({ trim: true, minlength: 20, maxlength: 160 })
   seoDescription?: string;
 
-  @Prop()
+  @Prop({ type: String })
   thumbnailPublicId?: string; 
 
   @Prop({ default: 'draft', enum: ['draft', 'published'] })
@@ -49,7 +49,7 @@ PostSchema.index({ tags: 1 });
 PostSchema.index({ status: 1, tenantId: 1 });
 PostSchema.index({ authorId: 1, tenantId: 1 });
 
-PostSchema.pre('save', function(next) {
+PostSchema.pre('save', function() {
   const doc = this as any;
   
   if (doc.isModified('status') && doc.status === 'published' && !doc.publishedAt) {
@@ -59,5 +59,4 @@ PostSchema.pre('save', function(next) {
   if (doc.isModified('status') && doc.status === 'draft') {
     doc.publishedAt = undefined;
   }
-  
 });

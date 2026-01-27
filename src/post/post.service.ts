@@ -112,7 +112,7 @@ export class PostService {
       updatePostDto.slug = uniqueSlug;
     }
 
-    // Auto-generate excerpt if content is updated
+
     if (updatePostDto.content && !updatePostDto.excerpt) {
       updatePostDto.excerpt = updatePostDto.content
         .substring(0, 200)
@@ -120,7 +120,7 @@ export class PostService {
         .trim();
     }
 
-    // Auto-generate SEO description if content is updated
+ 
     if (updatePostDto.content && !updatePostDto.seoDescription) {
       updatePostDto.seoDescription = updatePostDto.content
         .substring(0, 160)
@@ -167,6 +167,27 @@ export class PostService {
     return this.postModel
       .countDocuments({ 
         tenantId: new Types.ObjectId(tenantId), 
+        status: 'published' 
+      })
+      .exec();
+  }
+
+  async findAllPublished(skip = 0, limit = 10): Promise<PostDocument[]> {
+    return this.postModel
+      .find({ 
+        status: 'published' 
+      })
+      .sort({ publishedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('authorId', 'username email profilePicture displayName bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async countAllPublished(): Promise<number> {
+    return this.postModel
+      .countDocuments({ 
         status: 'published' 
       })
       .exec();
@@ -302,5 +323,44 @@ export class PostService {
     }
 
     await this.postModel.deleteOne({ _id: id });
+  }
+
+  async findTestPosts(): Promise<PostDocument[]> {
+    const testPattern = /test/i; // Case-insensitive match for "test"
+    return this.postModel
+      .find({
+        $or: [
+          { title: { $regex: testPattern } },
+          { slug: { $regex: testPattern } },
+          { content: { $regex: testPattern, $options: 'i' } }
+        ]
+      })
+      .populate('authorId', 'username email')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
+
+  async removeTestPosts(): Promise<{ deletedCount: number; deletedPosts: any[] }> {
+    const testPosts = await this.findTestPosts();
+    const deletedPosts = testPosts.map(post => ({
+      id: post._id.toString(),
+      title: post.title,
+      slug: post.slug,
+      tenantId: post.tenantId
+    }));
+
+    const testPattern = /test/i;
+    const result = await this.postModel.deleteMany({
+      $or: [
+        { title: { $regex: testPattern } },
+        { slug: { $regex: testPattern } },
+        { content: { $regex: testPattern, $options: 'i' } }
+      ]
+    });
+
+    return {
+      deletedCount: result.deletedCount || 0,
+      deletedPosts
+    };
   }
 }
