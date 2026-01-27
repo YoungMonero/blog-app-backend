@@ -112,7 +112,7 @@ export class PostService {
       updatePostDto.slug = uniqueSlug;
     }
 
-    // Auto-generate excerpt if content is updated
+
     if (updatePostDto.content && !updatePostDto.excerpt) {
       updatePostDto.excerpt = updatePostDto.content
         .substring(0, 200)
@@ -120,7 +120,7 @@ export class PostService {
         .trim();
     }
 
-    // Auto-generate SEO description if content is updated
+ 
     if (updatePostDto.content && !updatePostDto.seoDescription) {
       updatePostDto.seoDescription = updatePostDto.content
         .substring(0, 160)

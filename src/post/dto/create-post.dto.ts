@@ -50,6 +50,8 @@ export class CreatePostDto {
   @IsString({ each: true })
   tags?: string[];
 
+ 
+
   @IsOptional()
   @IsString()
   @MinLength(20)
