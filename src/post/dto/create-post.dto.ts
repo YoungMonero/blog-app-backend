@@ -50,7 +50,10 @@ export class CreatePostDto {
   @IsString({ each: true })
   tags?: string[];
 
- 
+  @IsOptional()
+  @IsString()
+  authorId?: string; 
+
 
   @IsOptional()
   @IsString()

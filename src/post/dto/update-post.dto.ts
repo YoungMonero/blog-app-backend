@@ -7,6 +7,10 @@ export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsBoolean()
   isFeatured?: boolean;
 
+   @IsOptional()
+  @IsString()
+  authorId?: string; 
+
   @IsOptional()
   thumbnailPublicId?: string;
 }

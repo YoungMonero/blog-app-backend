@@ -59,11 +59,17 @@ export class PostController {
         throw new BadRequestException('SEO description must be between 20 and 160 characters');
       }
       
-      const userId = req.user.sub || req.user.userId;
+      // Get user ID - use from DTO if provided, otherwise from JWT
+      const authorId = createPostDto.authorId || req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
 
-      if (!userId || !tenantId) {
-        this.logger.error('Missing user ID or tenant ID');
+      if (!authorId) {
+        this.logger.error('Missing author ID');
+        throw new BadRequestException('Author ID is required');
+      }
+
+      if (!tenantId) {
+        this.logger.error('Missing tenant ID');
         throw new ForbiddenException('No blog/tenant associated with this account.');
       }
 
@@ -85,8 +91,7 @@ export class PostController {
         }
       }
 
-      // Create post with explicit thumbnail field - ensure it's always included
-      // Using a more explicit approach to ensure fields are passed
+      // Create post data with authorId
       const postData: any = {
         title: createPostDto.title,
         content: createPostDto.content,
@@ -95,26 +100,26 @@ export class PostController {
         tags: createPostDto.tags || [],
         seoDescription: createPostDto.seoDescription,
         status: createPostDto.status ?? 'published',
-        // Explicitly include thumbnail fields - very important!
+        // Explicitly include thumbnail fields
         thumbnail: thumbnailUrl ?? createPostDto.thumbnail ?? null,
         thumbnailPublicId: thumbnailPublicId ?? undefined,
+        // Include authorId
+        authorId: authorId,
       };
 
       // Debug logging
       this.logger.log(`Post data to save: ${JSON.stringify({
         title: postData.title,
+        authorId: postData.authorId,
         hasThumbnail: !!postData.thumbnail,
         thumbnail: postData.thumbnail,
-        thumbnailPublicId: postData.thumbnailPublicId,
-        thumbnailFieldExists: 'thumbnail' in postData
       })}`);
 
-      const result = await this.postService.create(postData, userId, tenantId);
+      // FIX: Use authorId instead of userId (which was undefined)
+      const result = await this.postService.create(postData, authorId, tenantId);
       
-      // Log what was actually saved
       this.logger.log(`Post created successfully: ${result._id}`);
-      this.logger.log(`Saved post thumbnail: ${result.thumbnail}`);
-      this.logger.log(`Has thumbnail field in saved document: ${'thumbnail' in result}`);
+      this.logger.log(`Author ID in saved post: ${result.authorId}`);
       
       return {
         success: true,
@@ -200,7 +205,6 @@ export class PostController {
           throw new BadRequestException(`Thumbnail upload failed: ${uploadError.message}`);
         }
       } else if (updatePostDto.thumbnail === null || updatePostDto.thumbnail === '') {
-
         if (currentPost.thumbnailPublicId) {
           try {
             await this.cloudinaryService.deleteImage(currentPost.thumbnailPublicId);
@@ -219,8 +223,7 @@ export class PostController {
         // Thumbnail URL was provided explicitly (not uploaded). Clear publicId unless explicitly provided.
         thumbnailPublicId = updatePostDto.thumbnailPublicId ?? null;
       }
-      
-      // Create update data with explicit thumbnail field
+
       const updateData: any = {
         title: updatePostDto.title,
         content: updatePostDto.content,
@@ -229,12 +232,10 @@ export class PostController {
         tags: updatePostDto.tags,
         seoDescription: updatePostDto.seoDescription,
         status: updatePostDto.status,
-        // Explicitly include thumbnail fields
         thumbnail: thumbnailUrl,
         thumbnailPublicId: thumbnailPublicId,
       };
 
-      // Remove undefined values to avoid overwriting with undefined
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) {
           delete updateData[key];
@@ -245,7 +246,9 @@ export class PostController {
       this.logger.log(`Thumbnail in update: ${updateData.thumbnail}`);
       this.logger.log(`Has thumbnail field in update: ${'thumbnail' in updateData}`);
 
+      // FIX: Changed from create() to update() method
       const result = await this.postService.update(id, updateData, userId, tenantId);
+      
       this.logger.log(`Post updated successfully: ${id}`);
       
       return {
@@ -288,7 +291,6 @@ export class PostController {
       throw new NotFoundException('Post not found');
     }
     
-    // Check if post belongs to user's tenant
     if (post.tenantId.toString() !== tenantId) {
       throw new ForbiddenException('You do not have permission to view this post');
     }
