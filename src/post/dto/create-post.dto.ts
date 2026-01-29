@@ -39,11 +39,23 @@ export class CreatePostDto {
   })
   thumbnail?: string;
 
+  // @IsOptional()
+  // @IsString()
+  // @MinLength(10, { message: 'Excerpt must be at least 10 characters long' })
+  // @MaxLength(500)
+  // excerpt?: string;
+
   @IsOptional()
-  @IsString()
-  @MinLength(10, { message: 'Excerpt must be at least 10 characters long' })
-  @MaxLength(500)
-  excerpt?: string;
+@Transform(({ value }) =>
+  typeof value === 'string' && value.trim().length === 0
+    ? undefined
+    : value
+)
+@IsString()
+@MinLength(10)
+@MaxLength(500)
+excerpt?: string;
+
 
   @IsOptional()
   @IsArray()
