@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUrl, MinLength, MaxLength, IsArray } from 'class-validator';
+import { 
+  IsString, 
+  IsNotEmpty, 
+  IsOptional, 
+  IsEnum, 
+  IsUrl, 
+  MinLength, 
+  MaxLength, 
+  IsArray 
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreatePostDto {
@@ -11,6 +20,7 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   @Transform(({ value, obj }) => {
+    // Auto-generate slug from title if not provided
     if (!value && obj.title) {
       return obj.title
         .toLowerCase()
@@ -26,18 +36,29 @@ export class CreatePostDto {
   @MinLength(10)
   content: string;
 
+  // --- CHANGED SECTION START ---
+  
   @IsOptional()
   @Transform(({ value }) => {
-  
     if (value === undefined || value === null || value === '') {
       return undefined;
     }
     return value;
   })
   @IsUrl({ require_protocol: true }, { 
-    message: 'Thumbnail must be a valid URL (or upload a picture from your gallery)'
+    message: 'Thumbnail must be a valid URL' 
   })
   thumbnail?: string;
+
+  /**
+   * Stores the Cloudinary Public ID (e.g., "blog-posts/xyz123").
+   * Crucial for deleting the image later when the post is updated or removed.
+   */
+  @IsOptional()
+  @IsString()
+  thumbnailPublicId?: string;
+
+  // --- CHANGED SECTION END ---
 
   @IsOptional()
   @IsString()
@@ -53,7 +74,6 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   authorId?: string; 
-
 
   @IsOptional()
   @IsString()
