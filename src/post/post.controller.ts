@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Body, Patch, Param, Delete, 
   UseGuards, Req, ForbiddenException, BadRequestException,
   UseInterceptors, UploadedFile, ParseFilePipe,
-  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException
+  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException,SetMetadata
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PostService } from './post.service';
@@ -11,6 +11,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { HasBlogGuard } from '../common/guards/has-blog.guard';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { Types } from 'mongoose';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard, HasBlogGuard)
@@ -279,14 +280,14 @@ export class PostController {
     };
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req) {
-    const tenantId = req.user.tenantId;
-    if (!tenantId) {
-      throw new ForbiddenException('Access denied: No tenant ID found in token.');
-    }
-    
-    const post = await this.postService.findOne(id);
+  @Get(':identifier')
+async findOne(@Param('identifier') identifier: string, @Req() req) {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.sub || req.user?.userId;
+
+    // We call the service, we don't use postModel here!
+    const post = await this.postService.findByIdOrSlug(identifier, tenantId);
+
     if (!post) {
       throw new NotFoundException('Post not found');
     }
@@ -294,10 +295,15 @@ export class PostController {
     if (post.tenantId.toString() !== tenantId) {
       throw new ForbiddenException('You do not have permission to view this post');
     }
-    
-    return {
-      success: true,
-      data: post
+
+  
+  if (!userId || post.authorId.toString() !== userId) {
+      throw new ForbiddenException('You do not have permission to view this draft');
+    }
+
+    return { 
+      success: true, 
+      data: post 
     };
   }
 

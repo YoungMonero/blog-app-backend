@@ -14,6 +14,22 @@ export class PublicPostController {
     private readonly tenantService: TenantService,
   ) {}
 
+    @Get('post/:slug')
+async getPublicPostBySlug(@Param('slug') slug: string) {
+  this.logger.log(`Public fetch for slug: ${slug}`);
+  
+  const post = await this.postService.findBySlugPublic(slug);
+  
+  if (!post) {
+    throw new NotFoundException('Post not found');
+  }
+
+  return {
+    success: true,
+    data: this.transformPost(post)
+  };
+}
+
   @Get()
   async getAllPublicPosts(
     @Query('page') page = 1,
@@ -309,4 +325,6 @@ export class PublicPostController {
     const words = content.trim().split(/\s+/).length;
     return Math.ceil(words / wordsPerMinute);
   }
+
+
 }
