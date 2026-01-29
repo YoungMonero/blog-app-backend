@@ -23,7 +23,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 export class BlogsController {
   constructor(private readonly blogsService: BlogsService) {}
 
-  /* ================= BLOG ================= */
 
   @Post()
   async createBlog(@Body() body: CreateBlogDto, @Req() req: AuthRequest) {
