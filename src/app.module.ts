@@ -23,7 +23,7 @@ import { UsersModule } from './users/users.module';
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        console.log('MONGO_URI =>', config.get('MONGO_URI')); // <-- debug log
+        console.log('MONGO_URI =>', config.get('MONGO_URI'));
         return {
           uri: config.get<string>('MONGO_URI'),
         };
