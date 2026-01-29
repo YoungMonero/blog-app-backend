@@ -363,4 +363,37 @@ export class PostService {
       deletedPosts
     };
   }
+
+  async findByIdOrSlug(identifier: string, tenantId: string): Promise<PostDocument | null> {
+    // Check if the identifier is a valid 24-character MongoDB ObjectId
+    const isId = /^[0-9a-fA-F]{24}$/.test(identifier);
+
+    if (isId) {
+      return this.postModel.findById(identifier)
+        .populate('authorId', 'username email profilePicture')
+        .exec();
+    }
+
+    // If it's not an   // Security check: Only the author can see their own draftsID, search by the slug field
+    return this.postModel.findOne({ 
+      slug: identifier, 
+      tenantId: new Types.ObjectId(tenantId) 
+    })
+    .populate('authorId', 'username email profilePicture')
+    .exec();
+  }
+
+  // Inside src/post/post.service.ts
+
+async findBySlugPublic(slug: string): Promise<PostDocument | null> {
+  return this.postModel
+    .findOne({ 
+      slug: slug, 
+      status: 'published' // Security: strictly only public posts
+    })
+    .populate('authorId', 'username displayName profilePicture bio')
+    .populate('tenantId', 'name slug')
+    .exec();
 }
+}
+
