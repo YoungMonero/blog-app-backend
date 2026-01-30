@@ -9,9 +9,10 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const logger = new Logger();
 
-    // Enable CORS
+
+    const api_flow = process.env.NEXT_PUBLIC_API_URL
     app.enableCors({
-      origin: 'http://localhost:3000',
+      origin: api_flow,
       credentials: true,
     });
 
@@ -24,7 +25,7 @@ async function bootstrap() {
       }),
     );
 
-    // ✅ Serve uploads folder statically at /uploads
+
     app.useStaticAssets(join(__dirname, '..', 'uploads'), {
       prefix: '/uploads/',
     });

@@ -20,7 +20,7 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   @Transform(({ value, obj }) => {
-    // Auto-generate slug from title if not provided
+
     if (!value && obj.title) {
       return obj.title
         .toLowerCase()
@@ -36,7 +36,6 @@ export class CreatePostDto {
   @MinLength(10)
   content: string;
 
-  // --- CHANGED SECTION START ---
   
   @IsOptional()
   @Transform(({ value }) => {

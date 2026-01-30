@@ -199,9 +199,6 @@ export class PostController {
     }
   }
 
-  // ==================================================================
-  // READ & DELETE (No major changes, just kept for context)
-  // ==================================================================
   @Get()
   async findAll(@Req() req) {
     const tenantId = req.user.tenantId;
