@@ -50,11 +50,9 @@ export class CreatePostDto {
   })
   thumbnail?: string;
 
-  // @IsOptional()
-  // @IsString()
-  // @MinLength(10, { message: 'Excerpt must be at least 10 characters long' })
-  // @MaxLength(500)
-  // excerpt?: string;
+@IsOptional()
+  @IsString()
+  thumbnailPublicId?: string;
 
   @IsOptional()
 @Transform(({ value }) =>
