@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUrl, MinLength, MaxLength, IsArray } from 'class-validator';
+import { 
+  IsString, 
+  IsNotEmpty, 
+  IsOptional, 
+  IsEnum, 
+  IsUrl, 
+  MinLength, 
+  MaxLength, 
+  IsArray 
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreatePostDto {
@@ -11,6 +20,7 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   @Transform(({ value, obj }) => {
+    // Auto-generate slug from title if not provided
     if (!value && obj.title) {
       return obj.title
         .toLowerCase()
@@ -26,16 +36,17 @@ export class CreatePostDto {
   @MinLength(10)
   content: string;
 
+  // --- CHANGED SECTION START ---
+  
   @IsOptional()
   @Transform(({ value }) => {
-  
     if (value === undefined || value === null || value === '') {
       return undefined;
     }
     return value;
   })
   @IsUrl({ require_protocol: true }, { 
-    message: 'Thumbnail must be a valid URL (or upload a picture from your gallery)'
+    message: 'Thumbnail must be a valid URL' 
   })
   thumbnail?: string;
 
@@ -62,7 +73,9 @@ excerpt?: string;
   @IsString({ each: true })
   tags?: string[];
 
- 
+  @IsOptional()
+  @IsString()
+  authorId?: string; 
 
   @IsOptional()
   @IsString()

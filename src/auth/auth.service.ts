@@ -84,13 +84,13 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ email: dto.email });
-    if (!user) throw new BadRequestException('Invalid credentials');
+    if (!user) throw new BadRequestException('email is in use');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new BadRequestException('Invalid credentials');
+    if (!valid) throw new BadRequestException('Invalid email or passwoed try again');
 
     // Find tenant
-    let tenant = await this.tenantModel.findOne({
+    let tenant = await this.tenantModel.findOne({ 
       $or: [{ owner: user._id.toString() }, { userId: user._id.toString() }],
     });
 

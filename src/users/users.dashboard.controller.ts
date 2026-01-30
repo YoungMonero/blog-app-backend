@@ -2,7 +2,8 @@ import {
   Controller, Get, Patch, UseGuards, Req, 
   UseInterceptors, UploadedFile, BadRequestException,
   Body, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator,
-  Logger
+  Logger,
+  NotFoundException // Add this import
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,7 +11,7 @@ import { TenantService } from '../tenants/tenant.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UsersService } from './users.service';
 
-@Controller('dashboard')
+@Controller('user')
 @UseGuards(JwtAuthGuard)
 export class DashboardController {
   private readonly logger = new Logger(DashboardController.name);
@@ -21,7 +22,38 @@ export class DashboardController {
     private readonly usersService: UsersService,
   ) {}
 
-  // Upload/Update profile picture
+  // Get current user - THIS WILL BE ACCESSIBLE AT /user/me
+  @Get('me')
+  async getCurrentUser(@Req() req) {
+    try {
+      const userId = req.user.sub || req.user.userId;
+      const user = await this.usersService.findById(userId);
+      
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      
+      return {
+        success: true,
+        data: {
+          id: user._id.toString(),
+          username: user.username,
+          email: user.email,
+          displayName: user.displayName || user.username,
+          bio: user.bio || '',
+          profilePicture: user.profilePicture,
+          role: user.role,
+          hasBlog: !!user.tenantId,
+          lastLoginAt: user.lastLoginAt,
+        }
+      };
+    } catch (error) {
+      this.logger.error('Get current user error:', error.message);
+      throw error;
+    }
+  }
+
+  // Upload/Update profile picture - THIS WILL BE ACCESSIBLE AT /user/profile/picture
   @Patch('profile/picture')
   @UseInterceptors(FileInterceptor('profilePicture'))
   async updateProfilePicture(
@@ -81,7 +113,7 @@ export class DashboardController {
     }
   }
 
-  // Remove profile picture
+  // Remove profile picture - THIS WILL BE ACCESSIBLE AT /user/profile/picture/remove
   @Patch('profile/picture/remove')
   async removeProfilePicture(@Req() req) {
     try {
@@ -109,7 +141,7 @@ export class DashboardController {
     }
   }
 
-  // Update profile information
+  // Update profile information - THIS WILL BE ACCESSIBLE AT /user/profile
   @Patch('profile')
   async updateProfile(
     @Req() req,
@@ -165,7 +197,7 @@ export class DashboardController {
     }
   }
 
-  // Get user profile
+  // Get user profile - THIS WILL BE ACCESSIBLE AT /user/profile
   @Get('profile')
   async getProfile(@Req() req) {
     const userId = req.user.sub || req.user.userId;
@@ -177,7 +209,7 @@ export class DashboardController {
     };
   }
 
-  // Get dashboard overview
+  // Get dashboard overview - THIS WILL BE ACCESSIBLE AT /user/
   @Get()
   async getDashboard(@Req() req) {
     const userId = req.user.sub || req.user.userId;
