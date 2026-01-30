@@ -60,6 +60,25 @@ async getPublicPostBySlug(@Param('slug') slug: string) {
     };
   }
 
+  @Get('popular')
+async getPopular() {
+  this.logger.log('Fetching popular posts');
+  const posts = await this.postService.getPopularPosts(5);
+  return {
+    success: true,
+    data: posts.map(post => this.transformPost(post))
+  };
+}
+  @Get('featured')
+async getFeatured() {
+  this.logger.log('Fetching editor picks');
+  const posts = await this.postService.getEditorsPicks(3);
+  return {
+    success: true,
+    data: posts.map(post => this.transformPost(post))
+  };
+}
+
   @Get('tenant/:tenantId')
   async getPostsByTenantId(
     @Param('tenantId') tenantId: string,

@@ -1,8 +1,8 @@
-import { 
-  Controller, Get, Post, Body, Patch, Param, Delete, 
+import {
+  Controller, Get, Post, Body, Patch, Param, Delete,
   UseGuards, Req, ForbiddenException, BadRequestException,
   UseInterceptors, UploadedFile, ParseFilePipe,
-  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException,SetMetadata
+  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException, SetMetadata
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PostService } from './post.service';
@@ -21,12 +21,12 @@ export class PostController {
   constructor(
     private readonly postService: PostService,
     private readonly cloudinaryService: CloudinaryService
-  ) {}
- 
+  ) { }
+
   @Post()
   @UseInterceptors(FileInterceptor('thumbnail'))
   async create(
-    @Body() createPostDto: CreatePostDto, 
+    @Body() createPostDto: CreatePostDto,
     @Req() req,
     @UploadedFile(
       new ParseFilePipe({
@@ -41,7 +41,7 @@ export class PostController {
     try {
       this.logger.log(`Creating post for user: ${req.user?.userId || req.user?.sub}`);
       this.logger.log(`Received data: ${JSON.stringify(createPostDto)}`);
-      
+
       // Validate required fields
       if (!createPostDto.title || !createPostDto.content) {
         throw new BadRequestException('Title and content are required');
@@ -51,15 +51,15 @@ export class PostController {
       if (createPostDto.tags && !Array.isArray(createPostDto.tags)) {
         throw new BadRequestException('Tags must be an array');
       }
-      
+
       if (createPostDto.excerpt && createPostDto.excerpt.length < 10) {
         throw new BadRequestException('Excerpt must be at least 10 characters');
       }
-      
+
       if (createPostDto.seoDescription && (createPostDto.seoDescription.length < 20 || createPostDto.seoDescription.length > 160)) {
         throw new BadRequestException('SEO description must be between 20 and 160 characters');
       }
-      
+
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
 
@@ -74,7 +74,7 @@ export class PostController {
       // Handle file upload if present
       if (file) {
         this.logger.log(`Uploading thumbnail: ${file.originalname} (${file.size} bytes)`);
-        
+
         try {
           const upload = await this.cloudinaryService.uploadImage(file, 'blog-posts');
           thumbnailUrl = upload.url;
@@ -111,12 +111,12 @@ export class PostController {
       })}`);
 
       const result = await this.postService.create(postData, userId, tenantId);
-      
+
       // Log what was actually saved
       this.logger.log(`Post created successfully: ${result._id}`);
       this.logger.log(`Saved post thumbnail: ${result.thumbnail}`);
       this.logger.log(`Has thumbnail field in saved document: ${'thumbnail' in result}`);
-      
+
       return {
         success: true,
         message: 'Post created successfully',
@@ -131,8 +131,8 @@ export class PostController {
   @Patch(':id')
   @UseInterceptors(FileInterceptor('thumbnail'))
   async update(
-    @Param('id') id: string, 
-    @Body() updatePostDto: UpdatePostDto, 
+    @Param('id') id: string,
+    @Body() updatePostDto: UpdatePostDto,
     @Req() req,
     @UploadedFile(
       new ParseFilePipe({
@@ -146,20 +146,20 @@ export class PostController {
   ) {
     try {
       this.logger.log(`Updating post: ${id}`);
-      
+
       // Validate optional fields if provided
       if (updatePostDto.tags && !Array.isArray(updatePostDto.tags)) {
         throw new BadRequestException('Tags must be an array');
       }
-      
+
       if (updatePostDto.excerpt && updatePostDto.excerpt.length < 10) {
         throw new BadRequestException('Excerpt must be at least 10 characters');
       }
-      
+
       if (updatePostDto.seoDescription && (updatePostDto.seoDescription.length < 20 || updatePostDto.seoDescription.length > 160)) {
         throw new BadRequestException('SEO description must be between 20 and 160 characters');
       }
-      
+
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
 
@@ -179,7 +179,7 @@ export class PostController {
       // Handle file upload if present
       if (file) {
         this.logger.log(`Uploading new thumbnail for post ${id}`);
-        
+
         // Delete old thumbnail from Cloudinary if exists
         if (currentPost.thumbnailPublicId) {
           try {
@@ -220,7 +220,7 @@ export class PostController {
         // Thumbnail URL was provided explicitly (not uploaded). Clear publicId unless explicitly provided.
         thumbnailPublicId = updatePostDto.thumbnailPublicId ?? null;
       }
-      
+
       // Create update data with explicit thumbnail field
       const updateData: any = {
         title: updatePostDto.title,
@@ -248,7 +248,7 @@ export class PostController {
 
       const result = await this.postService.update(id, updateData, userId, tenantId);
       this.logger.log(`Post updated successfully: ${id}`);
-      
+
       return {
         success: true,
         message: 'Post updated successfully',
@@ -266,10 +266,10 @@ export class PostController {
     if (!tenantId) {
       throw new ForbiddenException('Access denied: No tenant ID found in token.');
     }
-    
+
     this.logger.log(`Fetching all posts for tenant: ${tenantId}`);
     const posts = await this.postService.findAllByTenant(tenantId);
-    
+
     return {
       success: true,
       count: posts.length,
@@ -278,7 +278,7 @@ export class PostController {
   }
 
   @Get(':identifier')
-async findOne(@Param('identifier') identifier: string, @Req() req) {
+  async findOne(@Param('identifier') identifier: string, @Req() req) {
     const tenantId = req.user?.tenantId;
     const userId = req.user?.sub || req.user?.userId;
 
@@ -293,14 +293,14 @@ async findOne(@Param('identifier') identifier: string, @Req() req) {
       return { success: true, data: post };
     }
 
-  
-  if (!userId || post.authorId.toString() !== userId) {
+
+    if (!userId || post.authorId.toString() !== userId) {
       throw new ForbiddenException('You do not have permission to view this draft');
     }
 
-    return { 
-      success: true, 
-      data: post 
+    return {
+      success: true,
+      data: post
     };
   }
 
@@ -308,10 +308,10 @@ async findOne(@Param('identifier') identifier: string, @Req() req) {
   async remove(@Param('id') id: string, @Req() req) {
     try {
       this.logger.log(`Deleting post: ${id}`);
-      
+
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
-      
+
       if (!tenantId) {
         throw new ForbiddenException('Access denied: Missing tenant context.');
       }
@@ -329,14 +329,15 @@ async findOne(@Param('identifier') identifier: string, @Req() req) {
 
       await this.postService.remove(id, userId, tenantId);
       this.logger.log(`Post deleted successfully: ${id}`);
-      
-      return { 
+
+      return {
         success: true,
-        message: 'Post deleted successfully' 
+        message: 'Post deleted successfully'
       };
     } catch (error) {
       this.logger.error('Delete Post Error:', error.message, error.stack);
       throw error;
     }
   }
+
 }
