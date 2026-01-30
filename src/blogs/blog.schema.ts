@@ -1,4 +1,52 @@
 
+// import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+// import { Document } from 'mongoose';
+
+// @Schema({ timestamps: true })
+// export class Blog extends Document {
+//   @Prop({ required: true })
+//   title: string;
+
+//   @Prop({ required: true, unique: true })
+//   slug: string;
+
+//   @Prop()
+//   description: string;
+
+//   @Prop({ required: true })
+//   tenantId: string;
+
+//   @Prop({ required: true })
+//   authorId: string;
+
+//   @Prop()
+//   content: string; // full body
+
+//   @Prop()
+//   excerpt: string; // short preview
+
+//   @Prop()
+//   coverImage: string; // featured image
+
+//   @Prop({ type: [String], default: [] })
+//   tags: string[];
+
+//   @Prop({ enum: ['draft', 'published', 'archived'], default: 'draft' })
+//   status: string;
+
+//   @Prop({ type: Date })
+//   publishedAt: Date;
+
+//   @Prop()
+//   metaTitle: string;
+
+//   @Prop()
+//   metaDescription: string;
+// }
+
+// export const BlogSchema = SchemaFactory.createForClass(Blog);
+
+
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -20,13 +68,18 @@ export class Blog extends Document {
   authorId: string;
 
   @Prop()
-  content: string; // full body
+  content: string;
 
   @Prop()
-  excerpt: string; // short preview
+  excerpt: string;
 
+  // ✅ COVER IMAGE (banner)
   @Prop()
-  coverImage: string; // featured image
+  coverImage: string;
+
+  // ✅ PROFILE IMAGE (avatar)
+  @Prop()
+  profileImage: string;
 
   @Prop({ type: [String], default: [] })
   tags: string[];

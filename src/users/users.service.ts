@@ -111,7 +111,7 @@ export class UsersService {
     return !existingUser;
   }
 
-  // Update tenant association
+
   async updateTenant(userId: string, tenantId: string ): Promise<UserDocument> {
     return this.update(userId, { tenantId });
   }

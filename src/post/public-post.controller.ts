@@ -24,7 +24,6 @@ async getPublicPostBySlug(@Param('slug') slug: string) {
     throw new NotFoundException('Post not found');
   }
 
-  // Reuse your existing transformPost helper to keep data clean
   return {
     success: true,
     data: this.transformPost(post)

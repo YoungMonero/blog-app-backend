@@ -12,11 +12,10 @@ export class PostService {
   ) {}
 
   async create(
-    createPostDto: CreatePostDto, 
-    userId: string, 
+    createPostDto: CreatePostDto,
+    userId: string,
     tenantId: string
   ): Promise<PostDocument> {
-
     let slug = createPostDto.slug;
     if (!slug) {
       slug = createPostDto.title
@@ -25,13 +24,12 @@ export class PostService {
         .replace(/[^a-z0-9-]/g, '');
     }
 
-    // Ensure slug is unique for this tenant
     let uniqueSlug = slug;
     let counter = 1;
-    
-    while (await this.postModel.findOne({ 
-      slug: uniqueSlug, 
-      tenantId: new Types.ObjectId(tenantId) 
+
+    while (await this.postModel.findOne({
+      slug: uniqueSlug,
+      tenantId: new Types.ObjectId(tenantId)
     })) {
       uniqueSlug = `${slug}-${counter}`;
       counter++;
@@ -45,7 +43,6 @@ export class PostService {
         .replace(/<[^>]*>/g, '')
         .trim();
     }
-
 
     let seoDescription = createPostDto.seoDescription;
     if (!seoDescription) {
@@ -70,21 +67,28 @@ export class PostService {
   }
 
   async update(
-    id: string, 
-    updatePostDto: UpdatePostDto, 
-    userId: string, 
+    id: string,
+    updatePostDto: UpdatePostDto,
+    userId: string,
     tenantId: string
   ): Promise<PostDocument> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Post not found');
+    }
+
     const post = await this.postModel.findById(id);
-    
+
     if (!post) {
       throw new NotFoundException('Post not found');
     }
 
-    // Check ownership
+    // Check ownership - convert both to string for comparison
+    const userIdObj = new Types.ObjectId(userId);
+    const tenantIdObj = new Types.ObjectId(tenantId);
+
     if (
-      post.authorId.toString() !== userId ||
-      post.tenantId.toString() !== tenantId
+      !post.authorId.equals(userIdObj) ||
+      !post.tenantId.equals(tenantIdObj)
     ) {
       throw new ForbiddenException('You do not have permission to update this post');
     }
@@ -95,24 +99,24 @@ export class PostService {
         .toLowerCase()
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '');
-      
-      // Make slug unique
+
+      // Make slug unique within the same tenant
       let uniqueSlug = newSlug;
       let counter = 1;
-      
-      while (await this.postModel.findOne({ 
-        slug: uniqueSlug, 
+
+      while (await this.postModel.findOne({
+        slug: uniqueSlug,
         tenantId: post.tenantId,
-        _id: { $ne: id }
+        _id: { $ne: new Types.ObjectId(id) }
       })) {
         uniqueSlug = `${newSlug}-${counter}`;
         counter++;
       }
-      
+
       updatePostDto.slug = uniqueSlug;
     }
 
-
+    // Auto-generate excerpt if content changed and excerpt not provided
     if (updatePostDto.content && !updatePostDto.excerpt) {
       updatePostDto.excerpt = updatePostDto.content
         .substring(0, 200)
@@ -120,13 +124,21 @@ export class PostService {
         .trim();
     }
 
- 
+    // Auto-generate SEO description if content changed and seoDescription not provided
     if (updatePostDto.content && !updatePostDto.seoDescription) {
       updatePostDto.seoDescription = updatePostDto.content
         .substring(0, 160)
         .replace(/<[^>]*>/g, '')
         .trim();
     }
+
+   // Handle publishedAt update when status changes to published
+if (updatePostDto.status === 'published' && post.status !== 'published') {
+  (updatePostDto as any).publishedAt = new Date();
+} else if (updatePostDto.status !== 'published') {
+  // If status is not published, remove publishedAt
+  (updatePostDto as any).publishedAt = null;
+}
 
     const updatedPost = await this.postModel.findByIdAndUpdate(
       id,
@@ -142,6 +154,10 @@ export class PostService {
   }
 
   async findAllByTenant(tenantId: string): Promise<PostDocument[]> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return [];
+    }
+
     return this.postModel
       .find({ tenantId: new Types.ObjectId(tenantId) })
       .sort({ createdAt: -1 })
@@ -150,10 +166,14 @@ export class PostService {
   }
 
   async findPublishedByTenant(tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return [];
+    }
+
     return this.postModel
-      .find({ 
-        tenantId: new Types.ObjectId(tenantId), 
-        status: 'published' 
+      .find({
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published'
       })
       .sort({ publishedAt: -1 })
       .skip(skip)
@@ -164,18 +184,22 @@ export class PostService {
   }
 
   async countPublishedByTenant(tenantId: string): Promise<number> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return 0;
+    }
+
     return this.postModel
-      .countDocuments({ 
-        tenantId: new Types.ObjectId(tenantId), 
-        status: 'published' 
+      .countDocuments({
+        tenantId: new Types.ObjectId(tenantId),
+        status: 'published'
       })
       .exec();
   }
 
   async findAllPublished(skip = 0, limit = 10): Promise<PostDocument[]> {
     return this.postModel
-      .find({ 
-        status: 'published' 
+      .find({
+        status: 'published'
       })
       .sort({ publishedAt: -1 })
       .skip(skip)
@@ -187,16 +211,20 @@ export class PostService {
 
   async countAllPublished(): Promise<number> {
     return this.postModel
-      .countDocuments({ 
-        status: 'published' 
+      .countDocuments({
+        status: 'published'
       })
       .exec();
   }
 
   async findBySlugAndTenant(slug: string, tenantId: string): Promise<PostDocument | null> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return null;
+    }
+
     return this.postModel
-      .findOne({ 
-        slug, 
+      .findOne({
+        slug,
         tenantId: new Types.ObjectId(tenantId),
         status: 'published'
       })
@@ -206,6 +234,10 @@ export class PostService {
   }
 
   async getTagsByTenant(tenantId: string): Promise<string[]> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return [];
+    }
+
     const result = await this.postModel
       .aggregate([
         {
@@ -234,6 +266,10 @@ export class PostService {
   }
 
   async findByTag(tag: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return [];
+    }
+
     return this.postModel
       .find({
         tenantId: new Types.ObjectId(tenantId),
@@ -249,6 +285,10 @@ export class PostService {
   }
 
   async countByTag(tag: string, tenantId: string): Promise<number> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return 0;
+    }
+
     return this.postModel
       .countDocuments({
         tenantId: new Types.ObjectId(tenantId),
@@ -259,6 +299,10 @@ export class PostService {
   }
 
   async search(query: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return [];
+    }
+
     const searchRegex = new RegExp(query, 'i');
     return this.postModel
       .find({
@@ -281,6 +325,10 @@ export class PostService {
   }
 
   async searchCount(query: string, tenantId: string): Promise<number> {
+    if (!Types.ObjectId.isValid(tenantId)) {
+      return 0;
+    }
+
     const searchRegex = new RegExp(query, 'i');
     return this.postModel
       .countDocuments({
@@ -308,16 +356,23 @@ export class PostService {
   }
 
   async remove(id: string, userId: string, tenantId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Post not found');
+    }
+
     const post = await this.postModel.findById(id);
-    
+
     if (!post) {
       throw new NotFoundException('Post not found');
     }
 
-    // Check ownership
+    // Check ownership - convert both to string for comparison
+    const userIdObj = new Types.ObjectId(userId);
+    const tenantIdObj = new Types.ObjectId(tenantId);
+
     if (
-      post.authorId.toString() !== userId ||
-      post.tenantId.toString() !== tenantId
+      !post.authorId.equals(userIdObj) ||
+      !post.tenantId.equals(tenantIdObj)
     ) {
       throw new ForbiddenException('You do not have permission to delete this post');
     }
@@ -326,13 +381,13 @@ export class PostService {
   }
 
   async findTestPosts(): Promise<PostDocument[]> {
-    const testPattern = /test/i; // Case-insensitive match for "test"
+    const testPattern = /test/i;
     return this.postModel
       .find({
         $or: [
           { title: { $regex: testPattern } },
           { slug: { $regex: testPattern } },
-          { content: { $regex: testPattern, $options: 'i' } }
+          { content: { $regex: testPattern } }
         ]
       })
       .populate('authorId', 'username email')
@@ -354,7 +409,7 @@ export class PostService {
       $or: [
         { title: { $regex: testPattern } },
         { slug: { $regex: testPattern } },
-        { content: { $regex: testPattern, $options: 'i' } }
+        { content: { $regex: testPattern } }
       ]
     });
 
