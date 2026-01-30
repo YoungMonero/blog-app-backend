@@ -13,7 +13,6 @@ import slugify from 'slugify';
 import { Blog } from './blog.schema';
 import { CreateBlogDto } from './dto/create-blog.dto';
 
-// ✅ Cloudinary
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 

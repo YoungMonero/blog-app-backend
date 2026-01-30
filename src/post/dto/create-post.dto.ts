@@ -50,21 +50,23 @@ export class CreatePostDto {
   })
   thumbnail?: string;
 
-  /**
-   * Stores the Cloudinary Public ID (e.g., "blog-posts/xyz123").
-   * Crucial for deleting the image later when the post is updated or removed.
-   */
-  @IsOptional()
-  @IsString()
-  thumbnailPublicId?: string;
-
-  // --- CHANGED SECTION END ---
+  // @IsOptional()
+  // @IsString()
+  // @MinLength(10, { message: 'Excerpt must be at least 10 characters long' })
+  // @MaxLength(500)
+  // excerpt?: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(10, { message: 'Excerpt must be at least 10 characters long' })
-  @MaxLength(500)
-  excerpt?: string;
+@Transform(({ value }) =>
+  typeof value === 'string' && value.trim().length === 0
+    ? undefined
+    : value
+)
+@IsString()
+@MinLength(10)
+@MaxLength(500)
+excerpt?: string;
+
 
   @IsOptional()
   @IsArray()

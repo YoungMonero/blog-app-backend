@@ -29,7 +29,7 @@ export class Post {
   @Prop({ type: [String], default: [] })
   tags?: string[];  
 
-  @Prop({ trim: true, minlength: 20, maxlength: 160 })
+  @Prop({ trim: true, minlength: 10, maxlength: 1000 })
   seoDescription?: string;
 
   @Prop({ type: String })
