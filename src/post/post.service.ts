@@ -450,5 +450,26 @@ async findBySlugPublic(slug: string): Promise<PostDocument | null> {
     .populate('tenantId', 'name slug')
     .exec();
 }
+
+async getPopularPosts(limit: number = 5) {
+  return this.postModel
+    .find({ status: 'published' }) 
+    .sort({ likes: -1 })           
+    .limit(5)
+    .exec();
+}
+
+async getEditorsPicks(limit: number = 3) {
+  return this.postModel
+    .find({ 
+      status: 'published', 
+      isFeatured: true 
+    })
+    .populate('authorId', 'username displayName profilePicture')
+    .populate('tenantId', 'name slug')
+    .sort({ createdAt: -1 }) // Show the newest picks first
+    .limit(limit)
+    .exec();
+}
 }
 

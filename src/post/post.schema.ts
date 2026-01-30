@@ -3,19 +3,19 @@ import { Document, Types } from 'mongoose';
 
 export type PostDocument = Post & Document;
 
-@Schema({ timestamps: true }) 
+@Schema({ timestamps: true })
 export class Post {
   @Prop({ type: Types.ObjectId, ref: 'Tenant', required: true, index: true })
   tenantId: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  authorId: Types.ObjectId; 
+  authorId: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
   title: string;
 
   @Prop({ required: true, trim: true })
-  slug: string; 
+  slug: string;
 
   @Prop({ required: true })
   content: string;
@@ -27,19 +27,25 @@ export class Post {
   excerpt?: string;
 
   @Prop({ type: [String], default: [] })
-  tags?: string[];  
+  tags?: string[];
 
   @Prop({ trim: true, minlength: 10, maxlength: 1000 })
   seoDescription?: string;
 
   @Prop({ type: String })
-  thumbnailPublicId?: string; 
+  thumbnailPublicId?: string;
 
   @Prop({ default: 'draft', enum: ['draft', 'published'] })
   status: 'draft' | 'published';
 
   @Prop({ type: Date })
   publishedAt?: Date;
+
+  @Prop({ default: 0 })
+  likes: number;
+
+  @Prop({ type: [String], default: [] })
+  likedBy: string[];
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
@@ -49,9 +55,9 @@ PostSchema.index({ tags: 1 });
 PostSchema.index({ status: 1, tenantId: 1 });
 PostSchema.index({ authorId: 1, tenantId: 1 });
 
-PostSchema.pre('save', function() {
+PostSchema.pre('save', function () {
   const doc = this as any;
-  
+
   if (doc.isModified('status') && doc.status === 'published' && !doc.publishedAt) {
     doc.publishedAt = new Date();
   }

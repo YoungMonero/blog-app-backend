@@ -14,14 +14,15 @@ export class CommentsController {
     @Req() req,
   ) {
     const userId = req.user.sub || req.user.userId;
-    const username = req.user.username;
+    const username = req.user.displayName || req.user.username || req.user.name || "Anonymous"
+    const userRole = req.user.role || 'reader';
 
     return this.commentsService.create({
       content: body.content,
       postId,
       userId,
       authorName: username,
-      authorRole: req.user.role,
+      authorRole: userRole,
     });
   }
 

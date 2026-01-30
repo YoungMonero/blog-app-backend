@@ -1,5 +1,5 @@
-import { 
-  Controller, Get, Post, Body, Patch, Param, Delete, 
+import {
+  Controller, Get, Post, Body, Patch, Param, Delete,
   UseGuards, Req, ForbiddenException, BadRequestException,
   UseInterceptors, UploadedFile, ParseFilePipe,
   MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException
@@ -140,7 +140,7 @@ export class PostController {
       if (updatePostDto.seoDescription && (updatePostDto.seoDescription.length < 20 || updatePostDto.seoDescription.length > 160)) {
         throw new BadRequestException('SEO description must be between 20 and 160 characters');
       }
-      
+
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
 
@@ -250,4 +250,5 @@ export class PostController {
       throw error;
     }
   }
+
 }
