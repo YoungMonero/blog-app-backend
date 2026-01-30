@@ -1,6 +1,3 @@
-
-
-
 import {
   Injectable,
   BadRequestException,
@@ -23,7 +20,7 @@ export class BlogsService {
     private readonly blogModel: Model<Blog>,
   ) {}
 
-  /* ================= BLOG ================= */
+
 
   async createBlog(dto: CreateBlogDto, tenantId: string, authorId: string) {
     try {
@@ -84,7 +81,7 @@ export class BlogsService {
     return blog.save();
   }
 
-  /* ================= BLOG IMAGE UPLOAD ================= */
+
 
   async uploadBlogImage(file: Express.Multer.File) {
     if (!file) {

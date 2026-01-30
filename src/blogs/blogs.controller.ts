@@ -1,5 +1,3 @@
-
-    
 import {
   Controller,
   Post,
@@ -54,7 +52,7 @@ export class BlogsController {
     );
   }
 
-  /* ================= BLOG IMAGES ================= */
+
 
   @Post('images')
   @UseInterceptors(FileInterceptor('file'))
@@ -63,7 +61,7 @@ export class BlogsController {
       throw new BadRequestException('No file uploaded');
     }
 
-    // ⬇️ Delegate upload to service (Cloudinary)
+
     return this.blogsService.uploadBlogImage(file);
   }
 }
