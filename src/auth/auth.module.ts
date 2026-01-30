@@ -9,7 +9,7 @@ import { AuthController } from './auth.controller';
 import { User, UserSchema } from '../users/user.schema';
 import { Tenant, TenantSchema } from '../tenants/tenant.schema';
 import { TenantModule } from '../tenants/tenant.module';
-import { JwtAuthGuard } from './jwt-auth.guard'; // 👈 add guard here if you want to provide it
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [

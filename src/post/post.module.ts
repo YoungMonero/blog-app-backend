@@ -6,14 +6,16 @@ import { PostService } from './post.service';
 import { Post, PostSchema } from './post.schema';
 import { UsersModule } from '../users/users.module'; 
 import { AuthModule } from '../auth/auth.module'; 
-import { TenantModule } from '../tenants/tenant.module'; 
+import { TenantModule } from '../tenants/tenant.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module' 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
     UsersModule,
     AuthModule,
-    TenantModule, 
+    TenantModule,
+    CloudinaryModule, 
   ],
   controllers: [PostController, PublicPostController],
   providers: [PostService],

@@ -20,16 +20,43 @@ export class Post {
   @Prop({ required: true })
   content: string;
 
-  @Prop()
-  thumbnail?: string;
+  @Prop({ type: String, default: null })
+  thumbnail?: string | null;
+
+  @Prop({ trim: true, minlength: 10, maxlength: 500 })
+  excerpt?: string;
+
+  @Prop({ type: [String], default: [] })
+  tags?: string[];  
+
+  @Prop({ trim: true, minlength: 10, maxlength: 1000 })
+  seoDescription?: string;
+
+  @Prop({ type: String })
+  thumbnailPublicId?: string; 
 
   @Prop({ default: 'draft', enum: ['draft', 'published'] })
   status: 'draft' | 'published';
 
-  @Prop()
+  @Prop({ type: Date })
   publishedAt?: Date;
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
 
 PostSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
+PostSchema.index({ tags: 1 });
+PostSchema.index({ status: 1, tenantId: 1 });
+PostSchema.index({ authorId: 1, tenantId: 1 });
+
+PostSchema.pre('save', function() {
+  const doc = this as any;
+  
+  if (doc.isModified('status') && doc.status === 'published' && !doc.publishedAt) {
+    doc.publishedAt = new Date();
+  }
+
+  if (doc.isModified('status') && doc.status === 'draft') {
+    doc.publishedAt = undefined;
+  }
+});
