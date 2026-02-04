@@ -17,6 +17,15 @@ export class Tenant extends Document {
 
   @Prop({ type: String, required: true })
   owner: string;
+
+  @Prop()
+  logo?: string;
+
+  @Prop()
+  coverImage?: string;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const TenantSchema = SchemaFactory.createForClass(Tenant);

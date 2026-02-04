@@ -41,8 +41,18 @@ export class HasBlogGuard implements CanActivate {
       );
     }
 
+    // Ensure token contains tenantId and it matches the tenant owned by this user
+    const tokenTenantId = user.tenantId;
+    if (!tokenTenantId) {
+      throw new ForbiddenException('Access denied: token is missing tenantId. Please obtain a new token after creating your blog.');
+    }
+
+    if (tenant._id.toString() !== tokenTenantId) {
+      throw new ForbiddenException('Token tenantId does not match your blog. Access denied.');
+    }
+
     request.tenant = tenant;
-    
+
     return true;
   }
 }
