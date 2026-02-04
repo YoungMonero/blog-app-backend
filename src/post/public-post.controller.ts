@@ -318,6 +318,8 @@ async getFeatured() {
       thumbnailPublicId: post.thumbnailPublicId || undefined, 
       tags: post.tags || [],
       seoDescription: post.seoDescription,
+      likes: post.likes || 0,
+      likedBy: post.likedBy || [],
       author: {
         id: post.authorId?._id,
         username: post.authorId?.username,

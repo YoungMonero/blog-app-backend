@@ -456,6 +456,8 @@ async getPopularPosts(limit: number = 5) {
     .find({ status: 'published' }) 
     .sort({ likes: -1 })           
     .limit(5)
+    .populate('authorId', 'username displayName profilePicture')
+    .populate('tenantId', 'name slug')
     .exec();
 }
 
