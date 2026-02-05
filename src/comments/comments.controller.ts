@@ -1,12 +1,12 @@
 import { Controller, Post, Get, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CommentsService } from './comments.service'; 
+import { CommentsService } from './comments.service';
 
-@Controller()
+@Controller('posts/:postId')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
-  @Post('posts/:postId/comments')
+  @Post('comments') 
   @UseGuards(JwtAuthGuard)
   async addComment(
     @Param('postId') postId: string,
@@ -14,23 +14,24 @@ export class CommentsController {
     @Req() req,
   ) {
     const userId = req.user.sub || req.user.userId;
-    const username = req.user.username;
+    const username = req.user.displayName || req.user.username || req.user.name || "Anonymous"
+    const userRole = req.user.role || 'reader';
 
     return this.commentsService.create({
       content: body.content,
       postId,
       userId,
       authorName: username,
-      authorRole: req.user.role,
+      authorRole: userRole,
     });
   }
 
-  @Get('posts/:postId/comments')
+  @Get('comments')  
   async getComments(@Param('postId') postId: string) {
     return this.commentsService.findByPost(postId);
   }
 
-  @Post('posts/:postId/like')
+  @Post('like')  
   @UseGuards(JwtAuthGuard)
   async toggleLike(@Param('postId') postId: string, @Req() req) {
     const userId = req.user.sub || req.user.userId;
