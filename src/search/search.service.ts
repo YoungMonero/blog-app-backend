@@ -209,7 +209,7 @@ export class SearchService {
     return tags.map(tag => ({
       type: 'tag',
       text: tag._id,
-      score: 1, // Simple scoring for tags
+      score: 1, 
       data: {
         name: tag._id,
         postCount: tag.postCount,
@@ -218,10 +218,6 @@ export class SearchService {
       },
     }));
   }
-
-  /* ---------------------------------- */
-  /* Public API */
-  /* ---------------------------------- */
 
   async getSuggestions(
     query: string,
@@ -234,7 +230,6 @@ export class SearchService {
     this.recordSearch(q);
     let results: SearchResult[] = [];
 
-    // Search based on type filter
     switch (type) {
       case 'user':
         results = await this.searchUsersWithText(q, limit);
@@ -252,7 +247,7 @@ export class SearchService {
         results = await this.searchTagsWithText(q, limit);
         break;
       
-      default: // Search all types
+      default: 
         const [users, posts, categories, tags] = await Promise.all([
           this.searchUsersWithText(q, Math.ceil(limit / 4)),
           this.searchPostsWithText(q, Math.ceil(limit / 4)),
@@ -263,7 +258,6 @@ export class SearchService {
         break;
     }
 
-    // Sort by score (MongoDB text score or our simple scoring)
     return {
       suggestions: results
         .sort((a, b) => b.score - a.score)
@@ -314,10 +308,6 @@ export class SearchService {
 
     return out;
   }
-
-  /* ---------------------------------- */
-  /* Analytics helper */
-  /* ---------------------------------- */
 
   private recordSearch(query: string): void {
     const key = `analytics:search:${new Date().toISOString().split('T')[0]}`;

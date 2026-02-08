@@ -204,24 +204,30 @@ export class PostController {
     const tenantId = req.user.tenantId;
     if (!tenantId) throw new ForbiddenException('Access denied: No tenant ID found in token.');
     
+    // This should still filter by tenant for dashboard view
     const posts = await this.postService.findAllByTenant(tenantId);
     return { success: true, count: posts.length, data: posts };
   }
-
   @Get(':identifier')
   async findOne(@Param('identifier') identifier: string, @Req() req) {
-    const tenantId = req.user?.tenantId;
     const userId = req.user?.sub || req.user?.userId;
-
-    const post = await this.postService.findByIdOrSlug(identifier, tenantId);
-
+  
+    // Find the post (don't filter by tenant - anyone can view any published post)
+    const post = await this.postService.findByIdOrSlug(identifier);
+    
     if (!post) throw new NotFoundException('Post not found');
-    if (post.tenantId.toString() !== tenantId) throw new ForbiddenException('You do not have permission to view this post');
-    if (!userId || post.authorId.toString() !== userId) throw new ForbiddenException('You do not have permission to view this draft');
-
+    
+    // Only restrict DRAFT posts to their authors
+    // Published posts are viewable by anyone
+    if (post.status === 'draft') {
+      if (!userId || post.authorId.toString() !== userId) {
+        throw new ForbiddenException('You do not have permission to view this draft');
+      }
+    }
+    
     return { success: true, data: post };
   }
-
+  
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req) {
     try {

@@ -21,6 +21,11 @@ export class CreateBlogDto {
 
   @IsString()
   @IsOptional()
+  authorName?: string;
+
+  
+  @IsString()
+  @IsOptional()
   coverImage?: string;
 
   @IsArray()

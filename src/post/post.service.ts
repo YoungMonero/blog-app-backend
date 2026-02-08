@@ -72,24 +72,21 @@ export class PostService {
     userId: string,
     tenantId: string
   ): Promise<PostDocument> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new NotFoundException('Post not found');
-    }
-
     const post = await this.postModel.findById(id);
-
+  
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-
-    // Check ownership - convert both to string for comparison
+  
+    // Check ownership - user must be both the author AND in the same tenant
     const userIdObj = new Types.ObjectId(userId);
     const tenantIdObj = new Types.ObjectId(tenantId);
-
-    if (
-      !post.authorId.equals(userIdObj) ||
-      !post.tenantId.equals(tenantIdObj)
-    ) {
+  
+    if (!post.authorId.equals(userIdObj)) {
+      throw new ForbiddenException('You do not have permission to update this post');
+    }
+    
+    if (!post.tenantId.equals(tenantIdObj)) {
       throw new ForbiddenException('You do not have permission to update this post');
     }
 
@@ -356,27 +353,24 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
   }
 
   async remove(id: string, userId: string, tenantId: string): Promise<void> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new NotFoundException('Post not found');
-    }
-
     const post = await this.postModel.findById(id);
-
+  
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-
-    // Check ownership - convert both to string for comparison
+  
+    // Check ownership - user must be both the author AND in the same tenant
     const userIdObj = new Types.ObjectId(userId);
     const tenantIdObj = new Types.ObjectId(tenantId);
-
-    if (
-      !post.authorId.equals(userIdObj) ||
-      !post.tenantId.equals(tenantIdObj)
-    ) {
+  
+    if (!post.authorId.equals(userIdObj)) {
       throw new ForbiddenException('You do not have permission to delete this post');
     }
-
+    
+    if (!post.tenantId.equals(tenantIdObj)) {
+      throw new ForbiddenException('You do not have permission to delete this post');
+    }
+  
     await this.postModel.deleteOne({ _id: id });
   }
 
@@ -419,25 +413,21 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
     };
   }
 
-  async findByIdOrSlug(identifier: string, tenantId: string): Promise<PostDocument | null> {
-    // Check if the identifier is a valid 24-character MongoDB ObjectId
+  async findByIdOrSlug(identifier: string): Promise<PostDocument | null> {
     const isId = /^[0-9a-fA-F]{24}$/.test(identifier);
-
+  
     if (isId) {
-      return this.postModel.findById(identifier)
+      // Find by ID without tenant filter
+      return this.postModel.findById(new Types.ObjectId(identifier))
         .populate('authorId', 'username email profilePicture')
         .exec();
     }
-
-    // If it's not an   // Security check: Only the author can see their own draftsID, search by the slug field
-    return this.postModel.findOne({ 
-      slug: identifier, 
-      tenantId: new Types.ObjectId(tenantId) 
-    })
-    .populate('authorId', 'username email profilePicture')
-    .exec();
+  
+    // Find by slug without tenant filter
+    return this.postModel.findOne({ slug: identifier })
+      .populate('authorId', 'username email profilePicture')
+      .exec();
   }
-
   // Inside src/post/post.service.ts
 
 async findBySlugPublic(slug: string): Promise<PostDocument | null> {

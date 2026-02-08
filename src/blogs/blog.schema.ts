@@ -16,7 +16,7 @@ export class Blog extends Document {
   tenantId: string;
 
   @Prop({ required: true })
-  authorId: string;
+  authorName: string;
 
   @Prop()
   content: string;
@@ -34,9 +34,6 @@ export class Blog extends Document {
 
   @Prop({ type: [String], default: [] })
   tags: string[];
-
-  @Prop({ enum: ['draft', 'published', 'archived'], default: 'draft' })
-  status: string;
 
   @Prop({ type: Date })
   publishedAt: Date;
