@@ -84,7 +84,7 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ email: dto.email });
-    if (!user) throw new BadRequestException('email is in use');
+    if (!user) throw new BadRequestException('Account does not exist');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new BadRequestException('Invalid email or passwoed try again');
