@@ -2,15 +2,17 @@ import {
   Injectable,
   BadRequestException,
   InternalServerErrorException,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import slugify from 'slugify';
+
 import { Blog } from './blog.schema';
 import { CreateBlogDto } from './dto/create-blog.dto';
+
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class BlogsService {
@@ -41,7 +43,6 @@ export class BlogsService {
         slug,
         tenantId,
         authorId,
-        // ✅ Status removed: Blogs are live immediately upon creation
       });
 
       return await blog.save();
@@ -56,15 +57,13 @@ export class BlogsService {
     return this.blogModel.findOne({ tenantId }).exec();
   }
 
-  // ✅ UPDATED: Removed status filter and changed sort to createdAt
-  async findAll() {
+  async findAllPublished() {
     return this.blogModel
-      .find() 
-      .sort({ createdAt: -1 }) 
+      .find()
+      .sort({ createdAt: -1 }) // Use createdAt if no publishedAt
       .exec();
   }
 
-  // ✅ UPDATED: Removed status filter to ensure public access works
   async getBlogBySlug(slug: string) {
     const blog = await this.blogModel.findOne({ slug }).exec();
     if (!blog) {
@@ -98,10 +97,11 @@ export class BlogsService {
   }
 
   async updateBlog(id: string, tenantId: string, updateData: Partial<CreateBlogDto>) {
+    // We include tenantId in the query so a user cannot update someone else's blog by ID
     const updatedBlog = await this.blogModel.findOneAndUpdate(
       { _id: id, tenantId }, 
       { $set: updateData },
-      { new: true }
+      { new: true } // Returns the updated document
     ).exec();
 
     if (!updatedBlog) {
@@ -112,6 +112,7 @@ export class BlogsService {
   }
 
   async deleteBlog(id: string, tenantId: string) {
+    // Ensuring the blog belongs to the requesting tenant before deletion
     const result = await this.blogModel.deleteOne({ _id: id, tenantId }).exec();
 
     if (result.deletedCount === 0) {
@@ -129,18 +130,23 @@ export class BlogsService {
     try {
       const uploadResult = await new Promise<any>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: 'blogs' },
+          {
+            folder: 'blogs',
+          },
           (error, result) => {
             if (error) return reject(error);
             resolve(result);
           },
         );
+
         Readable.from(file.buffer).pipe(uploadStream);
       });
 
       return {
         success: true,
-        data: { url: uploadResult.secure_url },
+        data: {
+          url: uploadResult.secure_url,
+        },
       };
     } catch (error) {
       console.error(error);

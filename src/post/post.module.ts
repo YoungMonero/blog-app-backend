@@ -8,6 +8,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module'; 
 import { TenantModule } from '../tenants/tenant.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module' 
+import { BlogsModule } from '../blogs/blogs.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module'
     UsersModule,
     AuthModule,
     TenantModule,
-    CloudinaryModule, 
+    CloudinaryModule,
+    BlogsModule, 
   ],
   controllers: [PostController, PublicPostController],
   providers: [PostService],
