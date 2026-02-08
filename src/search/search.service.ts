@@ -82,9 +82,10 @@ export class SearchService {
         { $text: { $search: query } },
         { score: { $meta: "textScore" } }
       )
-      .sort({ score: { $meta: "textScore" } })
-      .limit(limit * 2)
-      .lean<LeanUser[]>();
+
+    .sort({ score: { $meta: "textScore" } })
+    .limit(limit * 2)
+    .lean<LeanUser[]>();
 
     return users.map(user => ({
       type: 'user',

@@ -13,6 +13,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { UploadModule } from './uploads/upload.module';
 import { CommentsModule } from './comments/comments.module';
 import { UsersModule } from './users/users.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { UsersModule } from './users/users.module';
     UploadModule,
     CommentsModule,
     UsersModule,
+    SearchModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

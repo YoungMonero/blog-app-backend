@@ -17,36 +17,75 @@ export class SearchIndexService implements OnApplicationBootstrap {
 
   async createIndexes() {
     try {
-      // Text indexes for search
-      await this.userModel.collection.createIndex(
-        { username: 'text', displayName: 'text', bio: 'text' },
-        { name: 'user_search_text', weights: { username: 3, displayName: 2, bio: 1 } }
-      );
+      console.log(' Starting search index creation...');
 
+      // SKIP user text index completely - it already exists
+      console.log('Skipping user text index - using existing "user_search_text_index"');
+
+      // ONLY create post text index (this is what's missing)
+      console.log('Creating post text index...');
       await this.postModel.collection.createIndex(
         { title: 'text', excerpt: 'text', tags: 'text' },
-        { name: 'post_search_text', weights: { title: 3, tags: 2, excerpt: 1 } }
+        { 
+          name: 'post_search_text', 
+          weights: { title: 3, tags: 2, excerpt: 1 } 
+        }
       );
+      console.log('Post text index created');
 
-      // Regular indexes for fast filtering
-      await this.postModel.collection.createIndex({ category: 1 });
-      await this.postModel.collection.createIndex({ tags: 1 });
-      await this.postModel.collection.createIndex({ createdAt: -1 });
-      await this.postModel.collection.createIndex({ published: 1 });
-      
-      // Compound indexes for common queries
-      await this.postModel.collection.createIndex({ 
-        published: 1, 
-        category: 1 
-      });
-      await this.postModel.collection.createIndex({ 
-        published: 1, 
-        tags: 1 
-      });
+      // Create regular indexes (simplified)
+      console.log('Creating regular indexes...');
+      await this.createRegularIndexes();
 
-      console.log('✅ Search indexes created successfully');
+      console.log(' Search index creation completed');
     } catch (error) {
-      console.error('❌ Failed to create search indexes:', error);
+      console.error('Failed to create search indexes:', error.message);
+      if (error.code === 85 || error.codeName === 'IndexOptionsConflict') {
+        console.log('Post text index might already exist with different options');
+      }
+    }
+  }
+
+  private async createRegularIndexes() {
+    try {
+      // Create each index separately with proper typing
+      await this.postModel.collection.createIndex(
+        { category: 1 } as any,
+        { name: 'category_idx' }
+      );
+      console.log('Created category_idx');
+
+      await this.postModel.collection.createIndex(
+        { tags: 1 } as any,
+        { name: 'tags_idx' }
+      );
+      console.log('Created tags_idx');
+
+      await this.postModel.collection.createIndex(
+        { createdAt: -1 } as any,
+        { name: 'createdAt_idx' }
+      );
+      console.log('Created createdAt_idx');
+
+      await this.postModel.collection.createIndex(
+        { published: 1 } as any,
+        { name: 'published_idx' }
+      );
+      console.log('Created published_idx');
+
+      await this.postModel.collection.createIndex(
+        { published: 1, category: 1 } as any,
+        { name: 'published_category_idx' }
+      );
+      console.log('Created published_category_idx');
+
+      await this.postModel.collection.createIndex(
+        { published: 1, tags: 1 } as any,
+        { name: 'published_tags_idx' }
+      );
+      console.log('Created published_tags_idx');
+    } catch (error) {
+      console.error('Failed to create regular indexes:', error.message);
     }
   }
 }

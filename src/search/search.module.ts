@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
 import { MongooseModule } from '@nestjs/mongoose';
 
-import { SearchController } from './search.controller'; // This should now work
+import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { SearchIndexService } from './search.index';
 
