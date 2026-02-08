@@ -109,7 +109,7 @@ export class SearchService {
     const posts = await this.postModel
       .find(
         { 
-          published: true,
+          status: "published",
           $text: { $search: query } 
         },
         { score: { $meta: "textScore" } }
@@ -147,7 +147,7 @@ export class SearchService {
     const categories = await this.postModel.aggregate([
       { 
         $match: { 
-          published: true,
+          status: "published",
           category: { $regex: query, $options: 'i' }
         }
       },
@@ -185,7 +185,7 @@ export class SearchService {
     const tags = await this.postModel.aggregate([
       { 
         $match: { 
-          published: true,
+          status: "published",
           tags: { $regex: query, $options: 'i' }
         }
       },

@@ -9,83 +9,61 @@ export class SearchIndexService implements OnApplicationBootstrap {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Post.name) private readonly postModel: Model<PostDocument>,
-  ) {}
+  ) {
+    console.log('🔧 SearchIndexService constructor called');
+  }
 
   async onApplicationBootstrap() {
+    console.log('🚀 onApplicationBootstrap() called - creating indexes');
     await this.createIndexes();
   }
 
   async createIndexes() {
     try {
-      console.log(' Starting search index creation...');
+      console.log('🔍 Starting search index creation...');
 
-      // SKIP user text index completely - it already exists
-      console.log('Skipping user text index - using existing "user_search_text_index"');
+      // CHECK EXISTING INDEXES FIRST
+      const postIndexes = await this.postModel.collection.indexes();
+      console.log('📋 EXISTING POST INDEXES:', postIndexes.map(idx => ({
+        name: idx.name,
+        type: idx.textIndexVersion ? 'text' : 'regular'
+      })));
 
-      // ONLY create post text index (this is what's missing)
-      console.log('Creating post text index...');
-      await this.postModel.collection.createIndex(
-        { title: 'text', excerpt: 'text', tags: 'text' },
-        { 
-          name: 'post_search_text', 
-          weights: { title: 3, tags: 2, excerpt: 1 } 
-        }
+      // Check if post text index already exists
+      const hasPostTextIndex = postIndexes.some(idx => 
+        idx.name === 'post_search_text' || 
+        (idx.weights && Object.keys(idx.weights).length > 0)
       );
-      console.log('Post text index created');
 
-      // Create regular indexes (simplified)
-      console.log('Creating regular indexes...');
-      await this.createRegularIndexes();
-
-      console.log(' Search index creation completed');
-    } catch (error) {
-      console.error('Failed to create search indexes:', error.message);
-      if (error.code === 85 || error.codeName === 'IndexOptionsConflict') {
-        console.log('Post text index might already exist with different options');
+      if (hasPostTextIndex) {
+        console.log('✅ Post text index already exists');
+        console.log('📊 Details:', postIndexes.find(idx => idx.name === 'post_search_text' || idx.weights));
+      } else {
+        console.log('📝 Creating post text index...');
+        
+        // CREATE POST TEXT INDEX
+        const result = await this.postModel.collection.createIndex(
+          { title: 'text', excerpt: 'text', tags: 'text' },
+          { 
+            name: 'post_search_text', 
+            weights: { title: 3, tags: 2, excerpt: 1 } 
+          }
+        );
+        console.log('✅ Post text index created:', result);
       }
-    }
-  }
 
-  private async createRegularIndexes() {
-    try {
-      // Create each index separately with proper typing
-      await this.postModel.collection.createIndex(
-        { category: 1 } as any,
-        { name: 'category_idx' }
-      );
-      console.log('Created category_idx');
-
-      await this.postModel.collection.createIndex(
-        { tags: 1 } as any,
-        { name: 'tags_idx' }
-      );
-      console.log('Created tags_idx');
-
-      await this.postModel.collection.createIndex(
-        { createdAt: -1 } as any,
-        { name: 'createdAt_idx' }
-      );
-      console.log('Created createdAt_idx');
-
-      await this.postModel.collection.createIndex(
-        { published: 1 } as any,
-        { name: 'published_idx' }
-      );
-      console.log('Created published_idx');
-
-      await this.postModel.collection.createIndex(
-        { published: 1, category: 1 } as any,
-        { name: 'published_category_idx' }
-      );
-      console.log('Created published_category_idx');
-
-      await this.postModel.collection.createIndex(
-        { published: 1, tags: 1 } as any,
-        { name: 'published_tags_idx' }
-      );
-      console.log('Created published_tags_idx');
+      console.log('🎉 Search index creation completed');
+      
     } catch (error) {
-      console.error('Failed to create regular indexes:', error.message);
+      console.error('❌ Failed to create search indexes:');
+      console.error('   Message:', error.message);
+      console.error('   Code:', error.code);
+      console.error('   CodeName:', error.codeName);
+      console.error('   Full error:', error);
+      
+      if (error.code === 85 || error.codeName === 'IndexOptionsConflict') {
+        console.log('💡 Index already exists with different options');
+      }
     }
   }
 }
