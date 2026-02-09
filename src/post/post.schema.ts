@@ -27,7 +27,7 @@ export class Post {
   excerpt?: string;
 
   @Prop({ type: [String], default: [] })
-  tags?: string[];
+  categories?: string[];
 
   @Prop({ trim: true, minlength: 10, maxlength: 1000 })
   seoDescription?: string;
@@ -51,7 +51,7 @@ export class Post {
 export const PostSchema = SchemaFactory.createForClass(Post);
 
 PostSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
-PostSchema.index({ tags: 1 });
+PostSchema.index({ categories: 1, tenantId: 1 }); 
 PostSchema.index({ status: 1, tenantId: 1 });
 PostSchema.index({ authorId: 1, tenantId: 1 });
 
