@@ -44,6 +44,15 @@ export class Post {
   @Prop({ default: 0 })
   likes: number;
 
+  @Prop({ default: 0 })
+commentsCount: number;
+
+@Prop({ default: 0 })
+views: number;
+
+@Prop({ type: [Types.ObjectId], ref: 'Comment', default: [] })
+commentIds?: Types.ObjectId[];
+
   @Prop({ type: [String], default: [] })
   likedBy: string[];
 }
