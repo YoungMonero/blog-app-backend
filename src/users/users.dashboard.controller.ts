@@ -239,7 +239,7 @@ export class DashboardController {
             description: 'Share your thoughts',
             path: '/posts',
             method: 'POST',
-            icon: '📝'
+            icon: ''
           },
           {
             title: 'View Your Blog',
@@ -261,7 +261,7 @@ export class DashboardController {
             description: 'Start publishing your ideas',
             path: '/tenants/create',
             method: 'POST',
-            icon: '🚀',
+            icon: '',
             highlight: true
           },
           {
@@ -269,14 +269,14 @@ export class DashboardController {
             description: 'Upload your profile picture',
             path: '/dashboard/profile/picture',
             method: 'PATCH',
-            icon: '🖼️'
+            icon: ''
           },
           {
             title: 'Explore Blogs',
             description: 'Read amazing content',
             path: '/public/blogs',
             method: 'GET',
-            icon: '🔍'
+            icon: ''
           },
         ],
       }

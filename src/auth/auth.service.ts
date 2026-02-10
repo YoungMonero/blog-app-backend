@@ -21,6 +21,16 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/i;
+  
+  if (!emailRegex.test(dto.email)) {
+    throw new BadRequestException('Email adress should include a @, .com');
+  };
+    if (!emailRegex.test(dto.email)) {
+      throw new BadRequestException('Please provide a valid email address');
+    }
+
     const [existingEmail, existingUsername] = await Promise.all([
       this.userModel.findOne({ email: dto.email }),
       this.userModel.findOne({ username: dto.username }),
@@ -31,7 +41,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // Create user
+
     const user = new this.userModel({
       email: dto.email,
       username: dto.username,
@@ -40,7 +50,7 @@ export class AuthService {
     });
     await user.save();
 
-    // Create tenant (safe slug)
+
     const tenantName = dto.username;
     const tenantSlug = slugify(tenantName, { lower: true, strict: true });
 
