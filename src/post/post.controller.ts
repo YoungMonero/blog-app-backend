@@ -57,15 +57,11 @@ export class PostController {
     }
   }
 
-  // ==================================================================
-  // 2. CREATE POST: Now data-only (Frontend sends URL from step 1)
-  // ==================================================================
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @Req() req) {
     try {
       this.logger.log(`Creating post for user: ${req.user?.userId || req.user?.sub}`);
-      
-      // DTO validation is handled by class-validator, keep only essential checks
+
       if (!createPostDto.title || !createPostDto.content) {
         throw new BadRequestException('Title and content are required');
       }
@@ -91,9 +87,6 @@ export class PostController {
     }
   }
 
-  // ==================================================================
-  // 3. UPDATE POST: Now data-only, but handles cleaning up old images
-  // ==================================================================
   @Patch(':id')
   async update(
     @Param('id') id: string, 
