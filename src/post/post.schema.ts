@@ -27,7 +27,7 @@ export class Post {
   excerpt?: string;
 
   @Prop({ type: [String], default: [] })
-  tags?: string[];
+  categories?: string[];
 
   @Prop({ trim: true, minlength: 10, maxlength: 1000 })
   seoDescription?: string;
@@ -44,6 +44,18 @@ export class Post {
   @Prop({ default: 0 })
   likes: number;
 
+  @Prop({ default: 0 })
+commentsCount: number;
+
+@Prop({ default: 0 })
+views: number;
+//
+@Prop({ type: [Types.ObjectId], ref: 'User', default: [] }) 
+viewedBy: Types.ObjectId[];
+//
+@Prop({ type: [Types.ObjectId], ref: 'Comment', default: [] })
+commentIds?: Types.ObjectId[];
+
   @Prop({ type: [String], default: [] })
   likedBy: string[];
 }
@@ -51,7 +63,7 @@ export class Post {
 export const PostSchema = SchemaFactory.createForClass(Post);
 
 PostSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
-PostSchema.index({ tags: 1 });
+PostSchema.index({ categories: 1, tenantId: 1 }); 
 PostSchema.index({ status: 1, tenantId: 1 });
 PostSchema.index({ authorId: 1, tenantId: 1 });
 

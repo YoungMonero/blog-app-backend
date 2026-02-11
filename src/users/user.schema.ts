@@ -1,9 +1,17 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
 
 @Schema({ timestamps: true })
 export class User extends Document {
-  @Prop({ required: true, unique: true })
+  @Prop({ 
+    required: true, 
+    unique: true,
+    validate: {
+      validator: (v: string) => /\S+@\S+\.\S+/.test(v),
+      message: 'Please provide a valid email address'
+    }
+  })
   email: string;
 
   @Prop({ required: true, unique: true })

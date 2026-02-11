@@ -12,6 +12,7 @@ import { CreateBlogDto } from './dto/create-blog.dto';
 
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class BlogsService {
@@ -20,9 +21,11 @@ export class BlogsService {
     private readonly blogModel: Model<Blog>,
   ) {}
 
-
-
-  async createBlog(dto: CreateBlogDto, tenantId: string, authorId: string) {
+  async createBlog(
+    dto: CreateBlogDto & { authorName: string }, 
+    tenantId: string, 
+    authorId: string
+  ) {
     try {
       const existingBlog = await this.blogModel.findOne({ tenantId });
       if (existingBlog) {
@@ -36,13 +39,10 @@ export class BlogsService {
       }
 
       const blog = new this.blogModel({
-        title: dto.title,
-        description: dto.description,
-        content: dto.content,
+        ...dto,
         slug,
         tenantId,
         authorId,
-        status: 'draft',
       });
 
       return await blog.save();
@@ -55,6 +55,21 @@ export class BlogsService {
 
   async getBlogByTenant(tenantId: string): Promise<Blog | null> {
     return this.blogModel.findOne({ tenantId }).exec();
+  }
+
+  async findAllPublished() {
+    return this.blogModel
+      .find()
+      .sort({ createdAt: -1 }) // Use createdAt if no publishedAt
+      .exec();
+  }
+
+  async getBlogBySlug(slug: string) {
+    const blog = await this.blogModel.findOne({ slug }).exec();
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
+    return blog;
   }
 
   async updateBlogImages(
@@ -81,7 +96,31 @@ export class BlogsService {
     return blog.save();
   }
 
+  async updateBlog(id: string, tenantId: string, updateData: Partial<CreateBlogDto>) {
+    // We include tenantId in the query so a user cannot update someone else's blog by ID
+    const updatedBlog = await this.blogModel.findOneAndUpdate(
+      { _id: id, tenantId }, 
+      { $set: updateData },
+      { new: true } // Returns the updated document
+    ).exec();
 
+    if (!updatedBlog) {
+      throw new NotFoundException('Blog not found or you do not have permission to edit it');
+    }
+
+    return updatedBlog;
+  }
+
+  async deleteBlog(id: string, tenantId: string) {
+    // Ensuring the blog belongs to the requesting tenant before deletion
+    const result = await this.blogModel.deleteOne({ _id: id, tenantId }).exec();
+
+    if (result.deletedCount === 0) {
+      throw new NotFoundException('Blog not found or you do not have permission to delete it');
+    }
+
+    return { success: true, message: 'Blog deleted successfully' };
+  }
 
   async uploadBlogImage(file: Express.Multer.File) {
     if (!file) {

@@ -7,6 +7,9 @@ export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsBoolean()
   isFeatured?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  publishedAt?: boolean;
 
   @IsOptional()
   @IsString()

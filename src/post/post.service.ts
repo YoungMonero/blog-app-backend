@@ -1,15 +1,25 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Post, PostDocument } from './post.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
+
 @Injectable()
 export class PostService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
   ) {}
+
+  private normalizeCategories(categories: string[]): string[] {
+    if (!Array.isArray(categories)) return [];
+    
+    return categories
+      .map(cat => String(cat).toLowerCase().trim())
+      .filter(cat => cat.length > 0)
+      .filter((cat, index, self) => self.indexOf(cat) === index);
+  }
 
   async create(
     createPostDto: CreatePostDto,
@@ -35,7 +45,6 @@ export class PostService {
       counter++;
     }
 
-    // Auto-generate excerpt if not provided
     let excerpt = createPostDto.excerpt;
     if (!excerpt) {
       excerpt = createPostDto.content
@@ -55,9 +64,12 @@ export class PostService {
     const post = new this.postModel({
       ...createPostDto,
       slug: uniqueSlug,
+      commentsCount: 0,
+      views: 0,
+      commentIds: [],
       excerpt,
       seoDescription,
-      tags: createPostDto.tags || [],
+      categories: this.normalizeCategories(createPostDto.categories || []),
       authorId: new Types.ObjectId(userId),
       tenantId: new Types.ObjectId(tenantId),
       publishedAt: createPostDto.status === 'published' ? new Date() : undefined,
@@ -66,98 +78,159 @@ export class PostService {
     return post.save();
   }
 
-  async update(
-    id: string,
-    updatePostDto: UpdatePostDto,
-    userId: string,
-    tenantId: string
-  ): Promise<PostDocument> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new NotFoundException('Post not found');
+
+async incrementViews(postId: string, userId?: string): Promise<any> {
+  try {
+    if (!Types.ObjectId.isValid(postId)) {
+      throw new BadRequestException('Invalid post ID format');
     }
 
-    const post = await this.postModel.findById(id);
-
+     const post = await this.postModel.findById(postId);
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-
-    // Check ownership - convert both to string for comparison
-    const userIdObj = new Types.ObjectId(userId);
-    const tenantIdObj = new Types.ObjectId(tenantId);
-
-    if (
-      !post.authorId.equals(userIdObj) ||
-      !post.tenantId.equals(tenantIdObj)
-    ) {
-      throw new ForbiddenException('You do not have permission to update this post');
+    
+    if (!userId) {
+      post.views += 1;
+      await post.save();
+      return { 
+        success: true, 
+        views: post.views, 
+        isNewView: true,
+        message: 'View counted (anonymous user)' 
+      };
     }
-
-    // Handle slug update if title changed
-    if (updatePostDto.title && updatePostDto.title !== post.title && !updatePostDto.slug) {
-      const newSlug = updatePostDto.title
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '');
-
-      // Make slug unique within the same tenant
-      let uniqueSlug = newSlug;
-      let counter = 1;
-
-      while (await this.postModel.findOne({
-        slug: uniqueSlug,
-        tenantId: post.tenantId,
-        _id: { $ne: new Types.ObjectId(id) }
-      })) {
-        uniqueSlug = `${newSlug}-${counter}`;
-        counter++;
-      }
-
-      updatePostDto.slug = uniqueSlug;
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID format');
     }
-
-    // Auto-generate excerpt if content changed and excerpt not provided
-    if (updatePostDto.content && !updatePostDto.excerpt) {
-      updatePostDto.excerpt = updatePostDto.content
-        .substring(0, 200)
-        .replace(/<[^>]*>/g, '')
-        .trim();
+    const userObjectId = new Types.ObjectId(userId);
+    const authorObjectId = post.authorId;
+    
+    if (userObjectId.equals(authorObjectId)) {
+      return { 
+        success: true, 
+        views: post.views, 
+        isNewView: false,
+        message: 'Author viewing own post - view not counted' 
+      };
     }
-
-    // Auto-generate SEO description if content changed and seoDescription not provided
-    if (updatePostDto.content && !updatePostDto.seoDescription) {
-      updatePostDto.seoDescription = updatePostDto.content
-        .substring(0, 160)
-        .replace(/<[^>]*>/g, '')
-        .trim();
-    }
-
-   // Handle publishedAt update when status changes to published
-if (updatePostDto.status === 'published' && post.status !== 'published') {
-  (updatePostDto as any).publishedAt = new Date();
-} else if (updatePostDto.status !== 'published') {
-  // If status is not published, remove publishedAt
-  (updatePostDto as any).publishedAt = null;
-}
-
-    const updatedPost = await this.postModel.findByIdAndUpdate(
-      id,
-      updatePostDto,
-      { new: true }
+    const hasViewed = post.viewedBy.some(viewerId => 
+      viewerId && viewerId.equals(userObjectId)
     );
+    if (hasViewed) {
+      return { 
+        success: true, 
+        views: post.views, 
+        isNewView: false,
+        message: 'User already viewed this post' 
+      };
+    }
+    post.viewedBy.push(userObjectId);
+    post.views += 1;
+    await post.save();
+    
+    return { 
+      success: true, 
+      views: post.views, 
+      isNewView: true,
+      message: 'View counted successfully' 
+    };
+  } catch (error) {
+    console.error(`Failed to increment views: ${error.message}`, error.stack);
+    if (error instanceof NotFoundException || 
+        error instanceof BadRequestException) {
+      throw error;
+    }
+    throw new BadRequestException(`Failed to increment views: ${error.message}`);
+  }
+}
+async update(
+  id: string,
+  updatePostDto: UpdatePostDto,
+  userId: string,
+  tenantId: string
+): Promise<PostDocument> {
+  const post = await this.postModel.findById(id);
 
-    if (!updatedPost) {
-      throw new NotFoundException('Post not found after update');
+  if (!post) {
+    throw new NotFoundException('Post not found');
+  }
+
+  const userIdObj = new Types.ObjectId(userId);
+  const tenantIdObj = new Types.ObjectId(tenantId);
+
+  if (!post.authorId.equals(userIdObj)) {
+    throw new ForbiddenException('You do not have permission to update this post');
+  }
+  
+  if (!post.tenantId.equals(tenantIdObj)) {
+    throw new ForbiddenException('You do not have permission to update this post');
+  }
+
+  if (updatePostDto.title && updatePostDto.title !== post.title && !updatePostDto.slug) {
+    const newSlug = updatePostDto.title
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    let uniqueSlug = newSlug;
+    let counter = 1;
+
+    while (await this.postModel.findOne({
+      slug: uniqueSlug,
+      tenantId: post.tenantId,
+      _id: { $ne: new Types.ObjectId(id) }
+    })) {
+      uniqueSlug = `${newSlug}-${counter}`;
+      counter++;
     }
 
-    return updatedPost;
+    updatePostDto.slug = uniqueSlug;
   }
+
+  if (updatePostDto.content && !updatePostDto.excerpt) {
+    updatePostDto.excerpt = updatePostDto.content
+      .substring(0, 200)
+      .replace(/<[^>]*>/g, '')
+      .trim();
+  }
+
+  if (updatePostDto.content && !updatePostDto.seoDescription) {
+    updatePostDto.seoDescription = updatePostDto.content
+      .substring(0, 160)
+      .replace(/<[^>]*>/g, '')
+      .trim();
+  }
+
+  if (updatePostDto.categories !== undefined) {
+    updatePostDto.categories = this.normalizeCategories(updatePostDto.categories);
+  }
+
+  const updateData: any = { ...updatePostDto };
+
+  if (updatePostDto.status === 'published' && post.status !== 'published') {
+    updateData.publishedAt = new Date();
+  } else if (updatePostDto.status === 'draft') {
+    updateData.publishedAt = null;
+  }
+
+  const updatedPost = await this.postModel.findByIdAndUpdate(
+    id,
+    updateData,
+    { new: true }
+  );
+
+  if (!updatedPost) {
+    throw new NotFoundException('Post not found after update');
+  }
+
+  return updatedPost;
+}
 
   async findAllByTenant(tenantId: string): Promise<PostDocument[]> {
     if (!Types.ObjectId.isValid(tenantId)) {
       return [];
     }
-
     return this.postModel
       .find({ tenantId: new Types.ObjectId(tenantId) })
       .sort({ createdAt: -1 })
@@ -170,14 +243,17 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
       return [];
     }
 
+    const validatedSkip = Math.max(0, skip);
+    const validatedLimit = Math.min(Math.max(1, limit), 100);
+
     return this.postModel
       .find({
         tenantId: new Types.ObjectId(tenantId),
         status: 'published'
       })
       .sort({ publishedAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .skip(validatedSkip)
+      .limit(validatedLimit)
       .populate('authorId', 'username email profilePicture displayName bio')
       .populate('tenantId', 'name slug')
       .exec();
@@ -197,13 +273,17 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
   }
 
   async findAllPublished(skip = 0, limit = 10): Promise<PostDocument[]> {
+
+    const validatedSkip = Math.max(0, skip);
+    const validatedLimit = Math.min(Math.max(1, limit), 100);
+
     return this.postModel
       .find({
         status: 'published'
       })
       .sort({ publishedAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .skip(validatedSkip)
+      .limit(validatedLimit)
       .populate('authorId', 'username email profilePicture displayName bio')
       .populate('tenantId', 'name slug')
       .exec();
@@ -233,69 +313,80 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
       .exec();
   }
 
-  async getTagsByTenant(tenantId: string): Promise<string[]> {
+  async getCategories(tenantId: string): Promise<string[]> {
     if (!Types.ObjectId.isValid(tenantId)) {
       return [];
     }
 
-    const result = await this.postModel
-      .aggregate([
-        {
-          $match: {
-            tenantId: new Types.ObjectId(tenantId),
-            status: 'published',
-            tags: { $exists: true, $not: { $size: 0 } }
-          }
-        },
-        {
-          $unwind: '$tags'
-        },
-        {
-          $group: {
-            _id: '$tags',
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $sort: { count: -1 }
-        }
-      ])
-      .exec();
-
-    return result.map(item => item._id);
+    return this.postModel.distinct('categories', {
+      tenantId: new Types.ObjectId(tenantId),
+      status: 'published',
+      categories: { $exists: true, $ne: [] }
+    });
   }
 
-  async findByTag(tag: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
+  async findByCategory(
+    category: string,
+    tenantId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{ posts: PostDocument[]; total: number; totalPages: number }> {
     if (!Types.ObjectId.isValid(tenantId)) {
-      return [];
+      return { posts: [], total: 0, totalPages: 0 };
     }
 
-    return this.postModel
-      .find({
-        tenantId: new Types.ObjectId(tenantId),
-        status: 'published',
-        tags: tag
-      })
+    const normalizedCategory = category.toLowerCase().trim();
+    
+    const query = {
+      tenantId: new Types.ObjectId(tenantId),
+      status: 'published',
+      categories: normalizedCategory
+    };
+
+    const total = await this.postModel.countDocuments(query);
+    const posts = await this.postModel
+      .find(query)
       .sort({ publishedAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .skip((Math.max(1, page) - 1) * Math.min(Math.max(1, limit), 50))
+      .limit(Math.min(Math.max(1, limit), 50))
       .populate('authorId', 'username email profilePicture displayName bio')
       .populate('tenantId', 'name slug')
       .exec();
+
+    return {
+      posts,
+      total,
+      totalPages: Math.ceil(total / Math.min(Math.max(1, limit), 50))
+    };
   }
 
-  async countByTag(tag: string, tenantId: string): Promise<number> {
+  async getCategoriesWithCounts(tenantId: string): Promise<Array<{ name: string; count: number }>> {
     if (!Types.ObjectId.isValid(tenantId)) {
-      return 0;
+      return [];
     }
 
-    return this.postModel
-      .countDocuments({
-        tenantId: new Types.ObjectId(tenantId),
-        status: 'published',
-        tags: tag
-      })
-      .exec();
+    const result = await this.postModel.aggregate([
+      { 
+        $match: { 
+          tenantId: new Types.ObjectId(tenantId),
+          status: 'published',
+          categories: { $exists: true, $ne: [] }
+        }
+      },
+      { $unwind: '$categories' },
+      { 
+        $group: { 
+          _id: '$categories', 
+          count: { $sum: 1 } 
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    return result.map(item => ({
+      name: item._id,
+      count: item.count
+    }));
   }
 
   async search(query: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
@@ -304,6 +395,11 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
     }
 
     const searchRegex = new RegExp(query, 'i');
+    
+
+    const validatedSkip = Math.max(0, skip);
+    const validatedLimit = Math.min(Math.max(1, limit), 100);
+
     return this.postModel
       .find({
         tenantId: new Types.ObjectId(tenantId),
@@ -313,12 +409,12 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
           { content: searchRegex },
           { excerpt: searchRegex },
           { seoDescription: searchRegex },
-          { tags: { $in: [searchRegex] } }
+          { categories: searchRegex }
         ]
       })
       .sort({ publishedAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .skip(validatedSkip)
+      .limit(validatedLimit)
       .populate('authorId', 'username email profilePicture displayName bio')
       .populate('tenantId', 'name slug')
       .exec();
@@ -339,7 +435,7 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
           { content: searchRegex },
           { excerpt: searchRegex },
           { seoDescription: searchRegex },
-          { tags: { $in: [searchRegex] } }
+          { categories: searchRegex }
         ]
       })
       .exec();
@@ -356,27 +452,24 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
   }
 
   async remove(id: string, userId: string, tenantId: string): Promise<void> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new NotFoundException('Post not found');
-    }
-
     const post = await this.postModel.findById(id);
-
+  
     if (!post) {
       throw new NotFoundException('Post not found');
     }
+  
 
-    // Check ownership - convert both to string for comparison
     const userIdObj = new Types.ObjectId(userId);
     const tenantIdObj = new Types.ObjectId(tenantId);
-
-    if (
-      !post.authorId.equals(userIdObj) ||
-      !post.tenantId.equals(tenantIdObj)
-    ) {
+  
+    if (!post.authorId.equals(userIdObj)) {
       throw new ForbiddenException('You do not have permission to delete this post');
     }
-
+    
+    if (!post.tenantId.equals(tenantIdObj)) {
+      throw new ForbiddenException('You do not have permission to delete this post');
+    }
+  
     await this.postModel.deleteOne({ _id: id });
   }
 
@@ -419,59 +512,57 @@ if (updatePostDto.status === 'published' && post.status !== 'published') {
     };
   }
 
-  async findByIdOrSlug(identifier: string, tenantId: string): Promise<PostDocument | null> {
-    // Check if the identifier is a valid 24-character MongoDB ObjectId
+  async findByIdOrSlug(identifier: string): Promise<PostDocument | null> {
     const isId = /^[0-9a-fA-F]{24}$/.test(identifier);
-
+  
     if (isId) {
-      return this.postModel.findById(identifier)
+
+      return this.postModel.findById(new Types.ObjectId(identifier))
         .populate('authorId', 'username email profilePicture')
         .exec();
     }
+  
 
-    // If it's not an   // Security check: Only the author can see their own draftsID, search by the slug field
-    return this.postModel.findOne({ 
-      slug: identifier, 
-      tenantId: new Types.ObjectId(tenantId) 
-    })
-    .populate('authorId', 'username email profilePicture')
-    .exec();
+    return this.postModel.findOne({ slug: identifier })
+      .populate('authorId', 'username email profilePicture')
+      .exec();
   }
 
-  // Inside src/post/post.service.ts
+  async findBySlugPublic(slug: string): Promise<PostDocument | null> {
+    return this.postModel
+      .findOne({ 
+        slug: slug, 
+        status: 'published'
+      })
+      .populate('authorId', 'username displayName profilePicture bio')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
 
-async findBySlugPublic(slug: string): Promise<PostDocument | null> {
-  return this.postModel
-    .findOne({ 
-      slug: slug, 
-      status: 'published' // Security: strictly only public posts
-    })
-    .populate('authorId', 'username displayName profilePicture bio')
-    .populate('tenantId', 'name slug')
-    .exec();
-}
+  async getPopularPosts(limit: number = 5) {
+    const validatedLimit = Math.min(Math.max(1, limit), 20);
+    
+    return this.postModel
+      .find({ status: 'published' }) 
+      .sort({ likes: -1 })           
+      .limit(validatedLimit)
+      .populate('authorId', 'username displayName profilePicture')
+      .populate('tenantId', 'name slug')
+      .exec();
+  }
 
-async getPopularPosts(limit: number = 5) {
-  return this.postModel
-    .find({ status: 'published' }) 
-    .sort({ likes: -1 })           
-    .limit(5)
-    .populate('authorId', 'username displayName profilePicture')
-    .populate('tenantId', 'name slug')
-    .exec();
+  async getEditorsPicks(limit: number = 3) {
+    const validatedLimit = Math.min(Math.max(1, limit), 10);
+    
+    return this.postModel
+      .find({ 
+        status: 'published', 
+        isFeatured: true 
+      })
+      .populate('authorId', 'username displayName profilePicture')
+      .populate('tenantId', 'name slug')
+      .sort({ createdAt: -1 })
+      .limit(validatedLimit)
+      .exec();
+  }
 }
-
-async getEditorsPicks(limit: number = 3) {
-  return this.postModel
-    .find({ 
-      status: 'published', 
-      isFeatured: true 
-    })
-    .populate('authorId', 'username displayName profilePicture')
-    .populate('tenantId', 'name slug')
-    .sort({ createdAt: -1 }) // Show the newest picks first
-    .limit(limit)
-    .exec();
-}
-}
-

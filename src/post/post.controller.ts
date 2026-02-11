@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Body, Patch, Param, Delete,
   UseGuards, Req, ForbiddenException, BadRequestException,
   UseInterceptors, UploadedFile, ParseFilePipe,
-  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException
+  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException, UnauthorizedException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PostService } from './post.service';
@@ -22,10 +22,8 @@ export class PostController {
     private readonly cloudinaryService: CloudinaryService
   ) {}
 
-  // ==================================================================
-  // 1. NEW ENDPOINT: Dedicated Thumbnail Upload
-  // ==================================================================
   @Post('thumbnail')
+  @UseGuards(JwtAuthGuard, HasBlogGuard)
   @UseInterceptors(FileInterceptor('thumbnail'))
   async uploadThumbnail(
     @UploadedFile(
@@ -55,31 +53,18 @@ export class PostController {
         }
       };
     } catch (error) {
-      this.logger.error('Thumbnail upload failed:', error.message);
+      this.logger.error('Thumbnail upload failed:', error.message, error.stack);
       throw new BadRequestException(`Upload failed: ${error.message}`);
     }
   }
 
-  // ==================================================================
-  // 2. CREATE POST: Now data-only (Frontend sends URL from step 1)
-  // ==================================================================
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @Req() req) {
     try {
       this.logger.log(`Creating post for user: ${req.user?.userId || req.user?.sub}`);
-      
-      // Validation
+
       if (!createPostDto.title || !createPostDto.content) {
         throw new BadRequestException('Title and content are required');
-      }
-      if (createPostDto.tags && !Array.isArray(createPostDto.tags)) {
-        throw new BadRequestException('Tags must be an array');
-      }
-      if (createPostDto.excerpt && createPostDto.excerpt.length < 10) {
-        throw new BadRequestException('Excerpt must be at least 10 characters');
-      }
-      if (createPostDto.seoDescription && (createPostDto.seoDescription.length < 20 || createPostDto.seoDescription.length > 160)) {
-        throw new BadRequestException('SEO description must be between 20 and 160 characters');
       }
       
       const authorId = createPostDto.authorId || req.user.sub || req.user.userId;
@@ -88,22 +73,7 @@ export class PostController {
       if (!authorId) throw new BadRequestException('Author ID is required');
       if (!tenantId) throw new ForbiddenException('No blog/tenant associated with this account.');
 
-      // Construct Post Data
-      // Note: We expect 'thumbnail' and 'thumbnailPublicId' to be in createPostDto now
-      const postData: any = {
-        title: createPostDto.title,
-        content: createPostDto.content,
-        slug: createPostDto.slug,
-        excerpt: createPostDto.excerpt,
-        tags: createPostDto.tags || [],
-        seoDescription: createPostDto.seoDescription,
-        status: createPostDto.status ?? 'published',
-        thumbnail: createPostDto.thumbnail || null,
-        thumbnailPublicId: createPostDto.thumbnailPublicId || undefined,
-        authorId: authorId,
-      };
-
-      const result = await this.postService.create(postData, authorId, tenantId);
+      const result = await this.postService.create(createPostDto, authorId, tenantId);
       
       this.logger.log(`Post created successfully: ${result._id}`);
       
@@ -118,9 +88,6 @@ export class PostController {
     }
   }
 
-  // ==================================================================
-  // 3. UPDATE POST: Now data-only, but handles cleaning up old images
-  // ==================================================================
   @Patch(':id')
   async update(
     @Param('id') id: string, 
@@ -130,15 +97,9 @@ export class PostController {
     try {
       this.logger.log(`Updating post: ${id}`);
       
-      // Validation
-      if (updatePostDto.tags && !Array.isArray(updatePostDto.tags)) {
-        throw new BadRequestException('Tags must be an array');
-      }
-      if (updatePostDto.excerpt && updatePostDto.excerpt.length < 10) {
-        throw new BadRequestException('Excerpt must be at least 10 characters');
-      }
-      if (updatePostDto.seoDescription && (updatePostDto.seoDescription.length < 20 || updatePostDto.seoDescription.length > 160)) {
-        throw new BadRequestException('SEO description must be between 20 and 160 characters');
+      // Validation - check categories instead of tags
+      if (updatePostDto.categories && !Array.isArray(updatePostDto.categories)) {
+        throw new BadRequestException('Categories must be an array');
       }
 
       const userId = req.user.sub || req.user.userId;
@@ -146,48 +107,59 @@ export class PostController {
 
       if (!tenantId) throw new ForbiddenException('Access denied: Missing tenant context.');
 
-      // Get current post to check for existing thumbnail logic
+      // Get current post to check for existing thumbnail logic and authorization
       const currentPost = await this.postService.findOne(id);
       if (!currentPost) {
         throw new NotFoundException('Post not found');
       }
 
-      // LOGIC: Delete old image from Cloudinary if a NEW image is provided or if image is removed
-      // We check if a new publicId is provided AND it is different from the old one
-      if (
-        updatePostDto.thumbnailPublicId && 
-        currentPost.thumbnailPublicId && 
-        updatePostDto.thumbnailPublicId !== currentPost.thumbnailPublicId
-      ) {
-        this.logger.log(`New thumbnail detected. Deleting old thumbnail: ${currentPost.thumbnailPublicId}`);
-        try {
-          await this.cloudinaryService.deleteImage(currentPost.thumbnailPublicId);
-        } catch (e) {
-          this.logger.warn(`Failed to delete old thumbnail: ${e.message}`);
-        }
+      // Check authorization BEFORE any operations
+      const userIdObj = new (require('mongoose').Types.ObjectId)(userId);
+      const tenantIdObj = new (require('mongoose').Types.ObjectId)(tenantId);
+      
+      if (!currentPost.authorId.equals(userIdObj)) {
+        throw new ForbiddenException('You do not have permission to update this post');
       }
       
-      // LOGIC: If thumbnail is explicitly set to null (removed by user)
-      if (updatePostDto.thumbnail === null && currentPost.thumbnailPublicId) {
-        this.logger.log(`Thumbnail removal detected. Deleting: ${currentPost.thumbnailPublicId}`);
-        try {
-          await this.cloudinaryService.deleteImage(currentPost.thumbnailPublicId);
-        } catch (e) {
-           this.logger.warn(`Failed to delete old thumbnail: ${e.message}`);
-        }
+      if (!currentPost.tenantId.equals(tenantIdObj)) {
+        throw new ForbiddenException('You do not have permission to update this post');
       }
 
-      const updateData: any = {
-        ...updatePostDto
-      };
+      // Store old thumbnail info for potential cleanup
+      const oldThumbnailPublicId = currentPost.thumbnailPublicId;
+      let shouldDeleteOldThumbnail = false;
+
+      // Check if we need to delete old thumbnail
+      if (updatePostDto.thumbnailPublicId && oldThumbnailPublicId) {
+        if (updatePostDto.thumbnailPublicId !== oldThumbnailPublicId) {
+          shouldDeleteOldThumbnail = true;
+          this.logger.log(`New thumbnail detected. Will delete old thumbnail after update: ${oldThumbnailPublicId}`);
+        }
+      } else if (updatePostDto.thumbnail === null && oldThumbnailPublicId) {
+        shouldDeleteOldThumbnail = true;
+        this.logger.log(`Thumbnail removal detected. Will delete old thumbnail after update: ${oldThumbnailPublicId}`);
+      }
 
       // Clean undefined fields
+      const updateData: UpdatePostDto = { ...updatePostDto };
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) delete updateData[key];
       });
 
+      // Perform the update first
       const result = await this.postService.update(id, updateData, userId, tenantId);
       
+      // Delete old thumbnail only after successful update
+      if (shouldDeleteOldThumbnail && oldThumbnailPublicId) {
+        try {
+          await this.cloudinaryService.deleteImage(oldThumbnailPublicId);
+          this.logger.log(`Successfully deleted old thumbnail: ${oldThumbnailPublicId}`);
+        } catch (e) {
+          this.logger.warn(`Failed to delete old thumbnail: ${e.message}`);
+          // Don't throw - the update succeeded, just log the warning
+        }
+      }
+
       return {
         success: true,
         message: 'Post updated successfully',
@@ -204,24 +176,53 @@ export class PostController {
     const tenantId = req.user.tenantId;
     if (!tenantId) throw new ForbiddenException('Access denied: No tenant ID found in token.');
     
+    // This should still filter by tenant for dashboard view
     const posts = await this.postService.findAllByTenant(tenantId);
     return { success: true, count: posts.length, data: posts };
   }
 
   @Get(':identifier')
   async findOne(@Param('identifier') identifier: string, @Req() req) {
-    const tenantId = req.user?.tenantId;
     const userId = req.user?.sub || req.user?.userId;
-
-    const post = await this.postService.findByIdOrSlug(identifier, tenantId);
-
+    const tenantId = req.user?.tenantId;
+  
+    // Find the post
+    const post = await this.postService.findByIdOrSlug(identifier);
+    
     if (!post) throw new NotFoundException('Post not found');
-    if (post.tenantId.toString() !== tenantId) throw new ForbiddenException('You do not have permission to view this post');
-    if (!userId || post.authorId.toString() !== userId) throw new ForbiddenException('You do not have permission to view this draft');
-
+    
+    // For draft posts, enforce stricter security
+    if (post.status === 'draft') {
+      if (!userId) {
+        throw new ForbiddenException('Authentication required to view draft posts');
+      }
+      
+      // Check both author AND tenant membership
+      const userIdObj = new (require('mongoose').Types.ObjectId)(userId);
+      const tenantIdObj = new (require('mongoose').Types.ObjectId)(tenantId);
+      
+      if (!post.authorId.equals(userIdObj)) {
+        throw new ForbiddenException('You do not have permission to view this draft');
+      }
+      
+      if (tenantId && !post.tenantId.equals(tenantIdObj)) {
+        throw new ForbiddenException('You do not have permission to view this draft');
+      }
+    }
+    
     return { success: true, data: post };
   }
 
+  @Post(':postId/view')
+  @UseGuards(JwtAuthGuard)
+async incrementView(@Param('postId') postId: string,  @Req() req) {
+  const userId = req.user.sub || req.user.userId;
+  if (!userId) {
+    throw new UnauthorizedException('User ID not found in token');
+  }
+  return this.postService.incrementViews(postId, userId);
+  }
+  
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req) {
     try {
@@ -231,11 +232,29 @@ export class PostController {
       if (!tenantId) throw new ForbiddenException('Access denied: Missing tenant context.');
 
       const post = await this.postService.findOne(id);
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+
+      const userIdObj = new (require('mongoose').Types.ObjectId)(userId);
+      const tenantIdObj = new (require('mongoose').Types.ObjectId)(tenantId);
+      
+      if (!post.authorId.equals(userIdObj)) {
+        throw new ForbiddenException('You do not have permission to delete this post');
+      }
+      
+      if (!post.tenantId.equals(tenantIdObj)) {
+        throw new ForbiddenException('You do not have permission to delete this post');
+      }
+
+      // Delete thumbnail if exists
       if (post?.thumbnailPublicId) {
         try {
           await this.cloudinaryService.deleteImage(post.thumbnailPublicId);
+          this.logger.log(`Successfully deleted thumbnail: ${post.thumbnailPublicId}`);
         } catch (e) {
           this.logger.warn(`Failed to delete thumbnail: ${e.message}`);
+          // Continue with post deletion even if thumbnail deletion fails
         }
       }
 
@@ -247,5 +266,4 @@ export class PostController {
       throw error;
     }
   }
-
 }

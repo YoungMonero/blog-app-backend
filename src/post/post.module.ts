@@ -8,17 +8,19 @@ import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module'; 
 import { TenantModule } from '../tenants/tenant.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module' 
-
+import { BlogsModule } from '../blogs/blogs.module';
+import { PostStatsService } from '../post/post-stats.service'
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
     UsersModule,
     AuthModule,
     TenantModule,
-    CloudinaryModule, 
+    CloudinaryModule,
+    BlogsModule, 
   ],
   controllers: [PostController, PublicPostController],
-  providers: [PostService],
+  providers: [PostService, PostStatsService],
   exports: [PostService],
 })
 export class PostModule {}
