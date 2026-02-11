@@ -49,7 +49,10 @@ commentsCount: number;
 
 @Prop({ default: 0 })
 views: number;
-
+//
+@Prop({ type: [Types.ObjectId], ref: 'User', default: [] }) 
+viewedBy: Types.ObjectId[];
+//
 @Prop({ type: [Types.ObjectId], ref: 'Comment', default: [] })
 commentIds?: Types.ObjectId[];
 

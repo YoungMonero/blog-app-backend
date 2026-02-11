@@ -78,12 +78,13 @@ export class PostService {
     return post.save();
   }
 
-  // In posts.service.ts - ADD this method
-async incrementViews(postId: string) {
+
+async incrementViews(postId: string, userId?: string): Promise<any> {
+  
   return this.postModel.findByIdAndUpdate(
     postId,
     { $inc: { views: 1 } },
-    { new: true } // Return updated document
+    { new: true } 
   );
 }
 
@@ -98,8 +99,7 @@ async incrementViews(postId: string) {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-  
-    // Check ownership - user must be both the author AND in the same tenant
+
     const userIdObj = new Types.ObjectId(userId);
     const tenantIdObj = new Types.ObjectId(tenantId);
   
@@ -111,14 +111,12 @@ async incrementViews(postId: string) {
       throw new ForbiddenException('You do not have permission to update this post');
     }
 
-    // Handle slug update if title changed
     if (updatePostDto.title && updatePostDto.title !== post.title && !updatePostDto.slug) {
       const newSlug = updatePostDto.title
         .toLowerCase()
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '');
 
-      // Make slug unique within the same tenant
       let uniqueSlug = newSlug;
       let counter = 1;
 
@@ -134,7 +132,6 @@ async incrementViews(postId: string) {
       updatePostDto.slug = uniqueSlug;
     }
 
-    // Auto-generate excerpt if content changed and excerpt not provided
     if (updatePostDto.content && !updatePostDto.excerpt) {
       updatePostDto.excerpt = updatePostDto.content
         .substring(0, 200)
@@ -142,7 +139,6 @@ async incrementViews(postId: string) {
         .trim();
     }
 
-    // Auto-generate SEO description if content changed and seoDescription not provided
     if (updatePostDto.content && !updatePostDto.seoDescription) {
       updatePostDto.seoDescription = updatePostDto.content
         .substring(0, 160)
@@ -150,7 +146,6 @@ async incrementViews(postId: string) {
         .trim();
     }
 
-    // Normalize categories if provided
     if (updatePostDto.categories !== undefined) {
       updatePostDto.categories = this.normalizeCategories(updatePostDto.categories);
     }
@@ -193,7 +188,6 @@ const updatedPost = await this.postModel.findByIdAndUpdate(
       return [];
     }
 
-    // Validate pagination parameters
     const validatedSkip = Math.max(0, skip);
     const validatedLimit = Math.min(Math.max(1, limit), 100);
 
@@ -224,7 +218,7 @@ const updatedPost = await this.postModel.findByIdAndUpdate(
   }
 
   async findAllPublished(skip = 0, limit = 10): Promise<PostDocument[]> {
-    // Validate pagination parameters
+
     const validatedSkip = Math.max(0, skip);
     const validatedLimit = Math.min(Math.max(1, limit), 100);
 
@@ -347,7 +341,7 @@ const updatedPost = await this.postModel.findByIdAndUpdate(
 
     const searchRegex = new RegExp(query, 'i');
     
-    // Validate pagination parameters
+
     const validatedSkip = Math.max(0, skip);
     const validatedLimit = Math.min(Math.max(1, limit), 100);
 
@@ -409,7 +403,7 @@ const updatedPost = await this.postModel.findByIdAndUpdate(
       throw new NotFoundException('Post not found');
     }
   
-    // Check ownership - user must be both the author AND in the same tenant
+
     const userIdObj = new Types.ObjectId(userId);
     const tenantIdObj = new Types.ObjectId(tenantId);
   
@@ -467,13 +461,13 @@ const updatedPost = await this.postModel.findByIdAndUpdate(
     const isId = /^[0-9a-fA-F]{24}$/.test(identifier);
   
     if (isId) {
-      // Find by ID without tenant filter
+
       return this.postModel.findById(new Types.ObjectId(identifier))
         .populate('authorId', 'username email profilePicture')
         .exec();
     }
   
-    // Find by slug without tenant filter
+
     return this.postModel.findOne({ slug: identifier })
       .populate('authorId', 'username email profilePicture')
       .exec();
@@ -512,7 +506,7 @@ const updatedPost = await this.postModel.findByIdAndUpdate(
       })
       .populate('authorId', 'username displayName profilePicture')
       .populate('tenantId', 'name slug')
-      .sort({ createdAt: -1 }) // Show the newest picks first
+      .sort({ createdAt: -1 })
       .limit(validatedLimit)
       .exec();
   }

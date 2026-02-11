@@ -23,6 +23,7 @@ export class PostController {
   ) {}
 
   @Post('thumbnail')
+  @UseGuards(JwtAuthGuard, HasBlogGuard)
   @UseInterceptors(FileInterceptor('thumbnail'))
   async uploadThumbnail(
     @UploadedFile(

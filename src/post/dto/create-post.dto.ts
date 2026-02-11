@@ -7,7 +7,7 @@ import {
   MinLength, 
   MaxLength, 
   IsArray,
-  IsNumber // Added missing import
+  IsNumber 
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -71,7 +71,6 @@ export class CreatePostDto {
       try {
         return JSON.parse(value);
       } catch {
-        // Removed console.error for production
         return value.split(',').map((item: string) => item.trim()).filter(Boolean);
       }
     }
@@ -108,11 +107,11 @@ export class CreatePostDto {
 
   @IsOptional()
   @IsNumber()
-  commentsCount?: number; // Removed default value
+  commentsCount?: number; 
 
   @IsOptional()
   @IsNumber()
-  views?: number; // Removed default value
+  views?: number; 
 
   @IsOptional()
   @IsEnum(['draft', 'published'])
