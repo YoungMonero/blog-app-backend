@@ -80,102 +80,157 @@ export class PostService {
 
 
 async incrementViews(postId: string, userId?: string): Promise<any> {
-  
-  return this.postModel.findByIdAndUpdate(
-    postId,
-    { $inc: { views: 1 } },
-    { new: true } 
-  );
-}
+  try {
+    if (!Types.ObjectId.isValid(postId)) {
+      throw new BadRequestException('Invalid post ID format');
+    }
 
-  async update(
-    id: string,
-    updatePostDto: UpdatePostDto,
-    userId: string,
-    tenantId: string
-  ): Promise<PostDocument> {
-    const post = await this.postModel.findById(id);
-  
+     const post = await this.postModel.findById(postId);
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-
-    const userIdObj = new Types.ObjectId(userId);
-    const tenantIdObj = new Types.ObjectId(tenantId);
-  
-    if (!post.authorId.equals(userIdObj)) {
-      throw new ForbiddenException('You do not have permission to update this post');
-    }
     
-    if (!post.tenantId.equals(tenantIdObj)) {
-      throw new ForbiddenException('You do not have permission to update this post');
+    if (!userId) {
+      post.views += 1;
+      await post.save();
+      return { 
+        success: true, 
+        views: post.views, 
+        isNewView: true,
+        message: 'View counted (anonymous user)' 
+      };
     }
-
-    if (updatePostDto.title && updatePostDto.title !== post.title && !updatePostDto.slug) {
-      const newSlug = updatePostDto.title
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '');
-
-      let uniqueSlug = newSlug;
-      let counter = 1;
-
-      while (await this.postModel.findOne({
-        slug: uniqueSlug,
-        tenantId: post.tenantId,
-        _id: { $ne: new Types.ObjectId(id) }
-      })) {
-        uniqueSlug = `${newSlug}-${counter}`;
-        counter++;
-      }
-
-      updatePostDto.slug = uniqueSlug;
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID format');
     }
-
-    if (updatePostDto.content && !updatePostDto.excerpt) {
-      updatePostDto.excerpt = updatePostDto.content
-        .substring(0, 200)
-        .replace(/<[^>]*>/g, '')
-        .trim();
+    const userObjectId = new Types.ObjectId(userId);
+    const authorObjectId = post.authorId;
+    
+    if (userObjectId.equals(authorObjectId)) {
+      return { 
+        success: true, 
+        views: post.views, 
+        isNewView: false,
+        message: 'Author viewing own post - view not counted' 
+      };
     }
-
-    if (updatePostDto.content && !updatePostDto.seoDescription) {
-      updatePostDto.seoDescription = updatePostDto.content
-        .substring(0, 160)
-        .replace(/<[^>]*>/g, '')
-        .trim();
+    const hasViewed = post.viewedBy.some(viewerId => 
+      viewerId && viewerId.equals(userObjectId)
+    );
+    if (hasViewed) {
+      return { 
+        success: true, 
+        views: post.views, 
+        isNewView: false,
+        message: 'User already viewed this post' 
+      };
     }
-
-    if (updatePostDto.categories !== undefined) {
-      updatePostDto.categories = this.normalizeCategories(updatePostDto.categories);
+    post.viewedBy.push(userObjectId);
+    post.views += 1;
+    await post.save();
+    
+    return { 
+      success: true, 
+      views: post.views, 
+      isNewView: true,
+      message: 'View counted successfully' 
+    };
+  } catch (error) {
+    console.error(`Failed to increment views: ${error.message}`, error.stack);
+    if (error instanceof NotFoundException || 
+        error instanceof BadRequestException) {
+      throw error;
     }
-
-    const updateData: any = { ...updatePostDto };
-
-if (updatePostDto.status === 'published' && post.status !== 'published') {
-  updateData.publishedAt = new Date();
-} else if (updatePostDto.status === 'draft') {
-  updateData.publishedAt = null;
-}
-
-const updatedPost = await this.postModel.findByIdAndUpdate(
-  id,
-  updateData,
-  { new: true }
-);
-
-    if (!updatedPost) {
-      throw new NotFoundException('Post not found after update');
-    }
-
-    return updatedPost;
+    throw new BadRequestException(`Failed to increment views: ${error.message}`);
   }
+}
+async update(
+  id: string,
+  updatePostDto: UpdatePostDto,
+  userId: string,
+  tenantId: string
+): Promise<PostDocument> {
+  const post = await this.postModel.findById(id);
+
+  if (!post) {
+    throw new NotFoundException('Post not found');
+  }
+
+  const userIdObj = new Types.ObjectId(userId);
+  const tenantIdObj = new Types.ObjectId(tenantId);
+
+  if (!post.authorId.equals(userIdObj)) {
+    throw new ForbiddenException('You do not have permission to update this post');
+  }
+  
+  if (!post.tenantId.equals(tenantIdObj)) {
+    throw new ForbiddenException('You do not have permission to update this post');
+  }
+
+  if (updatePostDto.title && updatePostDto.title !== post.title && !updatePostDto.slug) {
+    const newSlug = updatePostDto.title
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    let uniqueSlug = newSlug;
+    let counter = 1;
+
+    while (await this.postModel.findOne({
+      slug: uniqueSlug,
+      tenantId: post.tenantId,
+      _id: { $ne: new Types.ObjectId(id) }
+    })) {
+      uniqueSlug = `${newSlug}-${counter}`;
+      counter++;
+    }
+
+    updatePostDto.slug = uniqueSlug;
+  }
+
+  if (updatePostDto.content && !updatePostDto.excerpt) {
+    updatePostDto.excerpt = updatePostDto.content
+      .substring(0, 200)
+      .replace(/<[^>]*>/g, '')
+      .trim();
+  }
+
+  if (updatePostDto.content && !updatePostDto.seoDescription) {
+    updatePostDto.seoDescription = updatePostDto.content
+      .substring(0, 160)
+      .replace(/<[^>]*>/g, '')
+      .trim();
+  }
+
+  if (updatePostDto.categories !== undefined) {
+    updatePostDto.categories = this.normalizeCategories(updatePostDto.categories);
+  }
+
+  const updateData: any = { ...updatePostDto };
+
+  if (updatePostDto.status === 'published' && post.status !== 'published') {
+    updateData.publishedAt = new Date();
+  } else if (updatePostDto.status === 'draft') {
+    updateData.publishedAt = null;
+  }
+
+  const updatedPost = await this.postModel.findByIdAndUpdate(
+    id,
+    updateData,
+    { new: true }
+  );
+
+  if (!updatedPost) {
+    throw new NotFoundException('Post not found after update');
+  }
+
+  return updatedPost;
+}
 
   async findAllByTenant(tenantId: string): Promise<PostDocument[]> {
     if (!Types.ObjectId.isValid(tenantId)) {
       return [];
     }
-
     return this.postModel
       .find({ tenantId: new Types.ObjectId(tenantId) })
       .sort({ createdAt: -1 })

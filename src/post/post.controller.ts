@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Body, Patch, Param, Delete,
   UseGuards, Req, ForbiddenException, BadRequestException,
   UseInterceptors, UploadedFile, ParseFilePipe,
-  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException
+  MaxFileSizeValidator, FileTypeValidator, Logger, NotFoundException, UnauthorizedException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PostService } from './post.service';
@@ -214,8 +214,13 @@ export class PostController {
   }
 
   @Post(':postId/view')
-async incrementView(@Param('postId') postId: string) {
-  return this.postService.incrementViews(postId);
+  @UseGuards(JwtAuthGuard)
+async incrementView(@Param('postId') postId: string,  @Req() req) {
+  const userId = req.user.sub || req.user.userId;
+  if (!userId) {
+    throw new UnauthorizedException('User ID not found in token');
+  }
+  return this.postService.incrementViews(postId, userId);
   }
   
   @Delete(':id')
