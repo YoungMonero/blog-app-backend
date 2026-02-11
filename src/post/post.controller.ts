@@ -247,14 +247,12 @@ async incrementView(@Param('postId') postId: string,  @Req() req) {
         throw new ForbiddenException('You do not have permission to delete this post');
       }
 
-      // Delete thumbnail if exists
       if (post?.thumbnailPublicId) {
         try {
           await this.cloudinaryService.deleteImage(post.thumbnailPublicId);
           this.logger.log(`Successfully deleted thumbnail: ${post.thumbnailPublicId}`);
         } catch (e) {
           this.logger.warn(`Failed to delete thumbnail: ${e.message}`);
-          // Continue with post deletion even if thumbnail deletion fails
         }
       }
 
