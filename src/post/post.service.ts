@@ -539,6 +539,21 @@ async update(
       .exec();
   }
 
+async getEditorsPicks(limit: number = 3) {
+  return this.postModel
+    .find({ 
+      status: 'published', 
+      isFeatured: true 
+    })
+    .populate('authorId', 'username displayName profilePicture')
+    .populate('tenantId', 'name slug')
+    .sort({ createdAt: -1 }) // Show the newest picks first
+    .limit(limit)
+    .exec();
+}
+
+
+}
   async getPopularPosts(limit: number = 5) {
     const validatedLimit = Math.min(Math.max(1, limit), 20);
     
