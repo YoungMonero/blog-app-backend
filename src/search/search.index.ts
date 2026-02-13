@@ -22,14 +22,12 @@ export class SearchIndexService implements OnApplicationBootstrap {
     try {
       console.log('Starting search index creation...');
 
-      // CHECK EXISTING INDEXES FIRST
       const postIndexes = await this.postModel.collection.indexes();
       console.log('EXISTING POST INDEXES:', postIndexes.map(idx => ({
         name: idx.name,
         type: idx.textIndexVersion ? 'text' : 'regular'
       })));
 
-      // Check if post text index already exists
       const hasPostTextIndex = postIndexes.some(idx => 
         idx.name === 'post_search_text' || 
         (idx.weights && Object.keys(idx.weights).length > 0)
@@ -42,6 +40,8 @@ export class SearchIndexService implements OnApplicationBootstrap {
         console.log('Creating post text index...');
         
         // CREATE POST TEXT INDEX
+      } else {
+
         const result = await this.postModel.collection.createIndex(
           { title: 'text', excerpt: 'text', tags: 'text' },
           { 
@@ -53,6 +53,7 @@ export class SearchIndexService implements OnApplicationBootstrap {
       }
 
       console.log('Search index creation completed');
+      }
       
     } catch (error) {
       console.error('Failed to create search indexes:');

@@ -10,16 +10,17 @@ export class CommentsController {
   @UseGuards(JwtAuthGuard)
   async addComment(
     @Param('postId') postId: string,
-    @Body() body: { content: string },
+    @Body() body: { content: string, parentCommentId?: string },
     @Req() req,
   ) {
     const userId = req.user.sub || req.user.userId;
-    const username = req.user.displayName || req.user.username || req.user.name || "Anonymous"
+    const username = req.user.displayName || req.user.username || req.user.name || "Anonymous";
     const userRole = req.user.role || 'reader';
 
     return this.commentsService.create({
       content: body.content,
       postId,
+      parentCommentId: body.parentCommentId,
       userId,
       authorName: username,
       authorRole: userRole,
@@ -36,5 +37,15 @@ export class CommentsController {
   async toggleLike(@Param('postId') postId: string, @Req() req) {
     const userId = req.user.sub || req.user.userId;
     return this.commentsService.toggleLike(postId, userId);
+  }
+
+  @Post('comments/:commentId/like')
+  @UseGuards(JwtAuthGuard)
+  async toggleCommentLike(
+    @Param('commentId') commentId: string,
+    @Req() req,
+  ) {
+    const userId = req.user.sub || req.user.userId;
+    return this.commentsService.toggleCommentLike(commentId, userId);
   }
 }

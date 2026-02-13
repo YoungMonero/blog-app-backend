@@ -6,7 +6,8 @@ import {
   IsUrl, 
   MinLength, 
   MaxLength, 
-  IsArray 
+  IsArray,
+  IsNumber 
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -20,7 +21,6 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   @Transform(({ value, obj }) => {
-
     if (!value && obj.title) {
       return obj.title
         .toLowerCase()
@@ -36,7 +36,6 @@ export class CreatePostDto {
   @MinLength(10)
   content: string;
 
-  
   @IsOptional()
   @Transform(({ value }) => {
     if (value === undefined || value === null || value === '') {
@@ -49,26 +48,52 @@ export class CreatePostDto {
   })
   thumbnail?: string;
 
-@IsOptional()
+  @IsOptional()
   @IsString()
   thumbnailPublicId?: string;
 
   @IsOptional()
-@Transform(({ value }) =>
-  typeof value === 'string' && value.trim().length === 0
-    ? undefined
-    : value
-)
-@IsString()
-@MinLength(10)
-@MaxLength(500)
-excerpt?: string;
-
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim().length === 0
+      ? undefined
+      : value
+  )
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  excerpt?: string;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  tags?: string[];
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value.split(',').map((item: string) => item.trim()).filter(Boolean);
+      }
+    }
+    
+    if (Array.isArray(value)) {
+      return value;
+    }
+    
+    return [];
+  })
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      const normalized = value
+        .map(cat => cat.toString().toLowerCase().trim())
+        .filter(cat => cat.length > 0)
+        .filter((cat, index, self) => self.indexOf(cat) === index)
+        .slice(0, 10); 
+      
+      return normalized;
+    }
+    return [];
+  })
+  categories?: string[];
 
   @IsOptional()
   @IsString()
@@ -79,6 +104,14 @@ excerpt?: string;
   @MinLength(20)
   @MaxLength(160)
   seoDescription?: string;
+
+  @IsOptional()
+  @IsNumber()
+  commentsCount?: number; 
+
+  @IsOptional()
+  @IsNumber()
+  views?: number; 
 
   @IsOptional()
   @IsEnum(['draft', 'published'])
