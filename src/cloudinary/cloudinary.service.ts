@@ -31,34 +31,33 @@ export class CloudinaryService {
     }
   }
 
-  async uploadImageFromBuffer(
+  async uploadOgImage(
     buffer: Buffer,
-    mimetype: string,
-    filename: string
-  ): Promise<string> {
+    publicId: string
+  ): Promise<{ url: string; publicId: string }> {
     return new Promise((resolve, reject) => {
-      cloudinary.uploader
-        .upload_stream(
-          {
-            folder: 'blog-app',
-            public_id: filename.replace(/\.[^/.]+$/, ''),
-            resource_type: 'auto',
-          },
-          (error, result) => {
-            if (error) {
-              return reject(error);
-            }
+      cloudinary.uploader.upload_stream(
+        {
+          folder: 'blog-og-images',
+          public_id: publicId,
+          format: 'png',
+        },
+        (error, result) => {
+          if (error) return reject(error);
   
-            if (!result?.secure_url) {
-              return reject(new Error('Cloudinary upload failed: no result returned'));
-            }
-  
-            resolve(result.secure_url);
+          if (!result?.secure_url || !result?.public_id) {
+            return reject(new Error('Cloudinary upload failed'));
           }
-        )
-        .end(buffer);
+  
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+          });
+        }
+      ).end(buffer);
     });
   }
+  
   
 
   async deleteImage(publicId: string): Promise<void> {
