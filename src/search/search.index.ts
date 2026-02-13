@@ -10,21 +10,21 @@ export class SearchIndexService implements OnApplicationBootstrap {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Post.name) private readonly postModel: Model<PostDocument>,
   ) {
-    console.log('🔧 SearchIndexService constructor called');
+    console.log('SearchIndexService constructor called');
   }
 
   async onApplicationBootstrap() {
-    console.log('🚀 onApplicationBootstrap() called - creating indexes');
+    console.log('onApplicationBootstrap() called - creating indexes');
     await this.createIndexes();
   }
 
   async createIndexes() {
     try {
-      console.log('🔍 Starting search index creation...');
+      console.log('Starting search index creation...');
 
       // CHECK EXISTING INDEXES FIRST
       const postIndexes = await this.postModel.collection.indexes();
-      console.log('📋 EXISTING POST INDEXES:', postIndexes.map(idx => ({
+      console.log('EXISTING POST INDEXES:', postIndexes.map(idx => ({
         name: idx.name,
         type: idx.textIndexVersion ? 'text' : 'regular'
       })));
@@ -36,10 +36,10 @@ export class SearchIndexService implements OnApplicationBootstrap {
       );
 
       if (hasPostTextIndex) {
-        console.log('✅ Post text index already exists');
-        console.log('📊 Details:', postIndexes.find(idx => idx.name === 'post_search_text' || idx.weights));
+        console.log('Post text index already exists');
+        console.log('Details:', postIndexes.find(idx => idx.name === 'post_search_text' || idx.weights));
       } else {
-        console.log('📝 Creating post text index...');
+        console.log('Creating post text index...');
         
         // CREATE POST TEXT INDEX
         const result = await this.postModel.collection.createIndex(
@@ -49,20 +49,20 @@ export class SearchIndexService implements OnApplicationBootstrap {
             weights: { title: 3, tags: 2, excerpt: 1 } 
           }
         );
-        console.log('✅ Post text index created:', result);
+        console.log('Post text index created:', result);
       }
 
-      console.log('🎉 Search index creation completed');
+      console.log('Search index creation completed');
       
     } catch (error) {
-      console.error('❌ Failed to create search indexes:');
+      console.error('Failed to create search indexes:');
       console.error('   Message:', error.message);
       console.error('   Code:', error.code);
       console.error('   CodeName:', error.codeName);
       console.error('   Full error:', error);
       
       if (error.code === 85 || error.codeName === 'IndexOptionsConflict') {
-        console.log('💡 Index already exists with different options');
+        console.log('Index already exists with different options');
       }
     }
   }
