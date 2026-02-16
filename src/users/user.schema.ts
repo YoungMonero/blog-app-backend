@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
 
 @Schema({ timestamps: true })
@@ -48,7 +48,6 @@ export class User extends Document {
   @Prop()
   resetCodeExpires?: Date;
 
-  // Optional: For email verification
   @Prop({ default: false })
   isEmailVerified?: boolean;
 
@@ -61,15 +60,17 @@ export class User extends Document {
 
   @Prop({ default: 0 })
   loginCount?: number;
-
+   
+  @Prop({ type: Types.ObjectId, ref: 'Blog' })
+  blog: Types.ObjectId;
  
 }
 
 export type UserDocument = User & Document;
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Optional: Add indexes for better performance
 UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ username: 1 }, { unique: true });
 UserSchema.index({ tenantId: 1 });
-UserSchema.index({ resetCodeExpires: 1 }, { expireAfterSeconds: 0 }); // Auto-clean expired codes
+UserSchema.index({ resetCodeExpires: 1 }, { expireAfterSeconds: 0 }); 
+UserSchema.index({ username: 'text', displayName: 'text' });
