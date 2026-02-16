@@ -3,7 +3,7 @@ import {
   UseInterceptors, UploadedFile, BadRequestException,
   Body, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator,
   Logger,
-  NotFoundException // Add this import
+  NotFoundException 
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -22,7 +22,6 @@ export class DashboardController {
     private readonly usersService: UsersService,
   ) {}
 
-  // Get current user - THIS WILL BE ACCESSIBLE AT /user/me
   @Get('me')
   async getCurrentUser(@Req() req) {
     try {
@@ -53,7 +52,6 @@ export class DashboardController {
     }
   }
 
-  // Upload/Update profile picture - THIS WILL BE ACCESSIBLE AT /user/profile/picture
   @Patch('profile/picture')
   @UseInterceptors(FileInterceptor('profilePicture'))
   async updateProfilePicture(
@@ -73,13 +71,11 @@ export class DashboardController {
       
       const userId = req.user.sub || req.user.userId;
       
-      // Get current user to check for existing picture
       const currentUser = await this.usersService.findById(userId);
       if (!currentUser) {
         throw new BadRequestException('User not found');
       }
       
-      // Delete old picture from Cloudinary if exists
       if (currentUser.profilePicturePublicId) {
         try {
           await this.cloudinaryService.deleteImage(currentUser.profilePicturePublicId);
@@ -89,11 +85,10 @@ export class DashboardController {
         }
       }
 
-      // Upload new picture to Cloudinary
+
       this.logger.log(`Uploading new profile picture: ${file.originalname} (${file.size} bytes)`);
       const upload = await this.cloudinaryService.uploadImage(file, 'user-profiles');
       
-      // Update user with both URL and public ID
       await this.usersService.updateProfilePicture(
         userId, 
         upload.url, 
@@ -113,7 +108,6 @@ export class DashboardController {
     }
   }
 
-  // Remove profile picture - THIS WILL BE ACCESSIBLE AT /user/profile/picture/remove
   @Patch('profile/picture/remove')
   async removeProfilePicture(@Req() req) {
     try {
@@ -141,7 +135,6 @@ export class DashboardController {
     }
   }
 
-  // Update profile information - THIS WILL BE ACCESSIBLE AT /user/profile
   @Patch('profile')
   async updateProfile(
     @Req() req,

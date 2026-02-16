@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import * as Joi from 'joi';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,23 +16,52 @@ import { CommentsModule } from './comments/comments.module';
 import { UsersModule } from './users/users.module';
 import { SearchModule } from './search/search.module';
 
-
 @Module({
   imports: [
+   
     ConfigModule.forRoot({
       isGlobal: true,
+      validationSchema: Joi.object({
+
+        MONGO_URI: Joi.string().required(),
+        JWT_SECRET: Joi.string().required().min(10).messages({
+          'string.min': 'JWT_SECRET should be at least 10 characters long (you have {#length})',
+          'any.required': 'JWT_SECRET is required'
+        }),
+        
+        PORT: Joi.number().default(4000),
+        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+        NEXT_PUBLIC_API_URL: Joi.string().uri().optional(),
+        
+      
+        EMAIL_HOST: Joi.string().optional(),
+        EMAIL_PORT: Joi.number().optional(),
+        EMAIL_USER: Joi.string().optional(),
+        EMAIL_PASS: Joi.string().optional(),
+      }),
+      validationOptions: {
+        abortEarly: false, 
+        allowUnknown: true,
+      },
     }),
 
     MongooseModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        console.log('MONGO_URI =>', config.get('MONGO_URI'));
+      useFactory: (configService: ConfigService) => {
         return {
-          uri: config.get<string>('MONGO_URI'),
+          uri: configService.get<string>('MONGO_URI'),
+
+          connectionFactory: (connection) => {
+
+            if (configService.get('NODE_ENV') === 'development') {
+              console.log('MongoDB connected successfully');
+            }
+            return connection;
+          },
         };
       },
     }),
-
+    
     AuthModule,
     TenantModule,
     BlogsModule,
