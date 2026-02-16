@@ -35,6 +35,15 @@ export class Post {
   @Prop({ type: String })
   thumbnailPublicId?: string;
 
+  @Prop({ type: String, default: null })
+  ogImagePublicId?: string; 
+
+  @Prop({ type: Boolean, default: false })
+  ogGenerated?: boolean; 
+
+  @Prop({ type: String, default: null })
+  ogImage?: string;
+
   @Prop({ default: 'draft', enum: ['draft', 'published'] })
   status: 'draft' | 'published';
 
@@ -45,14 +54,14 @@ export class Post {
   likes: number;
 
   @Prop({ default: 0 })
-commentsCount: number;
+  commentsCount: number;
 
 @Prop({ default: 0 })
 views: number;
-//
+
 @Prop({ type: [Types.ObjectId], ref: 'User', default: [] }) 
 viewedBy: Types.ObjectId[];
-//
+
 @Prop({ type: [Types.ObjectId], ref: 'Comment', default: [] })
 commentIds?: Types.ObjectId[];
 

@@ -14,7 +14,7 @@ import { UploadModule } from './uploads/upload.module';
 import { CommentsModule } from './comments/comments.module';
 import { UsersModule } from './users/users.module';
 import { SearchModule } from './search/search.module';
-import { OgModule } from './og/og.module';
+
 
 @Module({
   imports: [
@@ -41,7 +41,6 @@ import { OgModule } from './og/og.module';
     CommentsModule,
     UsersModule,
     SearchModule,
-    OgModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

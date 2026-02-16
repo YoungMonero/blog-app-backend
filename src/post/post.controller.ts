@@ -156,7 +156,6 @@ export class PostController {
           this.logger.log(`Successfully deleted old thumbnail: ${oldThumbnailPublicId}`);
         } catch (e) {
           this.logger.warn(`Failed to delete old thumbnail: ${e.message}`);
-          // Don't throw - the update succeeded, just log the warning
         }
       }
 
