@@ -64,28 +64,96 @@ export class BlogsService {
     return this.blogModel.find().sort({ createdAt: -1 }).exec();
   }
 
-async getBlogBySlug(slug: string) {
-  const blog = await this.blogModel.findOne({ slug }).lean();
+  async getBlogBySlug(slug: string) {
+    const blog = await this.blogModel.findOne({ slug }).lean();
 
-  if (!blog) {
-    throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
+
+    const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+    const posts = await this.postModel
+      .find({
+        tenantId: tenantObjectId, 
+        status: 'published',
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      ...blog,
+      posts: posts || [],
+    };
   }
 
-  const tenantObjectId = new Types.ObjectId(blog.tenantId);
+  async getPostsByCategory(slug: string, category: string) {
+    const blog = await this.blogModel.findOne({ slug }).lean();
 
-  const posts = await this.postModel
-    .find({
-      tenantId: tenantObjectId, 
-      status: 'published',
-    })
-    .sort({ createdAt: -1 })
-    .lean();
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
 
-  return {
-    ...blog,
-    posts: posts || [],
-  };
-}
+    const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+    const posts = await this.postModel
+      .find({
+        tenantId: tenantObjectId,
+        status: 'published',
+        categories: category,
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      blog: {
+        title: blog.title,
+        slug: blog.slug,
+        categories: blog.categories, 
+      },
+      category,
+      posts: posts || [],
+      count: posts.length,
+    };
+  }
+
+
+  async getBlogCategories(slug: string) {
+    const blog = await this.blogModel.findOne({ slug }).lean();
+
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
+
+    const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+
+    const categoryStats = await this.postModel.aggregate([
+      {
+        $match: {
+          tenantId: tenantObjectId,
+          status: 'published',
+          categories: { $exists: true, $ne: [] }
+        }
+      },
+      { $unwind: '$categories' },
+      {
+        $group: {
+          _id: '$categories',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    return {
+      blogTitle: blog.title,
+      categories: categoryStats.map(stat => ({
+        name: stat._id,
+        postCount: stat.count
+      }))
+    };
+  }
 
   async updateBlogImages(
     tenantId: string,

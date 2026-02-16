@@ -1,5 +1,3 @@
-// blogs.controller.ts
-
 import {
   Controller,
   Post,
@@ -43,7 +41,7 @@ export class BlogsController {
     return this.blogsService.getBlogBySlug(slug);
   }
 
-  // --- PROTECTED ROUTES (Token Required) ---
+
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -52,7 +50,7 @@ export class BlogsController {
     const authorName = req.user.username || body.authorName || 'Anonymous'; 
     
     return this.blogsService.createBlog(
-      { ...body, authorName }, // Pass the authorName to the service
+      { ...body, authorName }, 
       req.user.tenantId,
       req.user.userId,
     );
@@ -65,7 +63,6 @@ export class BlogsController {
     return { blog: blog ?? null };
   }
 
-  // Update specific images (banner/avatar)
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   async updateMyBlogImages(
@@ -75,7 +72,7 @@ export class BlogsController {
     return this.blogsService.updateBlogImages(req.user.tenantId, body);
   }
 
-  // Update general blog content (title, description, etc.)
+
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateBlog(
