@@ -40,8 +40,6 @@ export class SearchIndexService implements OnApplicationBootstrap {
         console.log('Creating post text index...');
         
         // CREATE POST TEXT INDEX
-      } else {
-
         const result = await this.postModel.collection.createIndex(
           { title: 'text', excerpt: 'text', tags: 'text' },
           { 
@@ -53,14 +51,12 @@ export class SearchIndexService implements OnApplicationBootstrap {
       }
 
       console.log('Search index creation completed');
-      }
       
     } catch (error) {
       console.error('Failed to create search indexes:');
       console.error('   Message:', error.message);
       console.error('   Code:', error.code);
       console.error('   CodeName:', error.codeName);
-      console.error('   Full error:', error);
       
       if (error.code === 85 || error.codeName === 'IndexOptionsConflict') {
         console.log('Index already exists with different options');

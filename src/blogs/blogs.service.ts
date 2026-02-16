@@ -13,6 +13,7 @@ import { CreateBlogDto } from './dto/create-blog.dto';
 
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class BlogsService {
@@ -63,27 +64,28 @@ export class BlogsService {
     return this.blogModel.find().sort({ createdAt: -1 }).exec();
   }
 
-  async getBlogBySlug(slug: string) {
-    const blog = await this.blogModel.findOne({ slug }).lean();
+async getBlogBySlug(slug: string) {
+  const blog = await this.blogModel.findOne({ slug }).lean();
 
-    if (!blog) {
-      throw new NotFoundException(`Blog with slug "${slug}" not found`);
-    }
-
-    // Fetches all published posts belonging to this blog/tenant
-    const posts = await this.postModel
-      .find({
-        tenantId: blog.tenantId,
-        status: 'published',
-      })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    return {
-      ...blog,
-      posts: posts || [],
-    };
+  if (!blog) {
+    throw new NotFoundException(`Blog with slug "${slug}" not found`);
   }
+
+  const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+  const posts = await this.postModel
+    .find({
+      tenantId: tenantObjectId, 
+      status: 'published',
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return {
+    ...blog,
+    posts: posts || [],
+  };
+}
 
   async updateBlogImages(
     tenantId: string,

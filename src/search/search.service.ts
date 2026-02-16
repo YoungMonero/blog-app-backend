@@ -69,31 +69,36 @@ export class SearchService {
     @InjectModel(Post.name) private readonly postModel: Model<PostDocument>,
   ) {}
 
-  /* ---------------------------------- */
-  /* MongoDB Text Search Methods */
-  /* ---------------------------------- */
 
-  private async searchUsersWithText(
+private async searchUsersWithText(
     query: string,
     limit: number,
   ): Promise<SearchResult[]> {
-    const users = await this.userModel
-      .find(
-        { $text: { $search: query } },
-        { score: { $meta: "textScore" } }
-      )
+    // 1. Create a safe regex from the query
+    const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escapes special characters
+    const searchRegex = new RegExp(safeQuery, 'i');
 
-    .sort({ score: { $meta: "textScore" } })
-    .limit(limit * 2)
-    .lean<LeanUser[]>();
+    // 2. Use find with $or to check both username and displayName
+    const users = await this.userModel
+      .find({
+        $or: [
+          { username: searchRegex },
+          { displayName: searchRegex }
+        ]
+      })
+      .limit(limit)
+      .populate('blog', 'slug') // This ensures we get 'funny-guy'
+      .lean<any[]>();
 
     return users.map(user => ({
       type: 'user',
       text: user.displayName ?? user.username,
-      score: user.score || 1, // MongoDB text score or default
+      score: 1, 
       data: {
         id: user._id.toString(),
         username: user.username,
+        // ✅ This sends 'funny-guy' to your frontend
+        slug: user.blog?.slug || user.username,
         avatar: user.avatar,
         followersCount: user.followersCount ?? 0,
         isVerified: user.isVerified ?? false,
