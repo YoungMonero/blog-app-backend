@@ -11,6 +11,10 @@ export class Blog extends Document {
   
   @Prop({ default: false })
   isPrivate: boolean;
+
+  @Prop({ default: 0 })
+  subscriberCount: number;
+
   
   @Prop()
   description: string;
@@ -32,6 +36,9 @@ export class Blog extends Document {
 
   @Prop()
   profileImage: string;
+  
+  @Prop({ type: [String], default: [] })
+  subscriberIds: string[]; 
 
   @Prop({ type: [String], default: [] })
   categories: string[];
@@ -49,4 +56,4 @@ export class Blog extends Document {
 export const BlogSchema = SchemaFactory.createForClass(Blog);
 
 BlogSchema.index({ categories: 1 });
-BlogSchema.index({ tenantId: 1, categories: 1 });
+BlogSchema.index({ tenantId: 1, categories: 1,  subscriberCount: -1 });

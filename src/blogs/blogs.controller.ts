@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   BadRequestException,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BlogsService } from './blogs.service';
@@ -72,7 +73,6 @@ export class BlogsController {
     return this.blogsService.updateBlogImages(req.user.tenantId, body);
   }
 
-
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateBlog(
@@ -97,5 +97,41 @@ export class BlogsController {
       throw new BadRequestException('No file uploaded');
     }
     return this.blogsService.uploadBlogImage(file);
+  }
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/subscribe')
+  async subscribe(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.blogsService.subscribe(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/subscribe')
+  async unsubscribe(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.blogsService.unsubscribe(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/subscription-status')
+  async getSubscriptionStatus(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.blogsService.getSubscriptionStatus(id, req.user.userId);
+  }
+
+  @Public()
+  @Get(':id/subscriber-count')
+  async getSubscriberCount(@Param('id') id: string) {
+    return this.blogsService.getSubscriberCount(id);
+  }
+
+  @Public()
+  @Get('popular/all')
+  async getPopularBlogs(@Query('limit') limit?: string) {
+    const limitNum = limit ? parseInt(limit) : 10;
+    return this.blogsService.getPopularBlogs(limitNum);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('user/subscriptions')
+  async getUserSubscriptions(@Req() req: AuthRequest) {
+    return this.blogsService.getUserSubscriptions(req.user.userId);
   }
 }

@@ -242,4 +242,102 @@ export class BlogsService {
       throw new InternalServerErrorException('Image upload failed');
     }
   }
+
+  // ============ SUBSCRIPTION METHODS ============
+
+async subscribe(blogId: string, userId: string) {
+  const blog = await this.blogModel.findById(blogId);
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  if (blog.subscriberIds.includes(userId)) {
+    throw new BadRequestException('Already subscribed to this blog');
+  }
+
+  blog.subscriberIds.push(userId);
+  blog.subscriberCount = blog.subscriberIds.length;
+  await blog.save();
+
+  return {
+    success: true,
+    message: 'Successfully subscribed to blog',
+    subscriberCount: blog.subscriberCount,
+    isSubscribed: true
+  };
+}
+
+async unsubscribe(blogId: string, userId: string) {
+  const blog = await this.blogModel.findById(blogId);
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  if (!blog.subscriberIds.includes(userId)) {
+    throw new BadRequestException('Not subscribed to this blog');
+  }
+
+  blog.subscriberIds = blog.subscriberIds.filter(id => id !== userId);
+  blog.subscriberCount = blog.subscriberIds.length;
+  await blog.save();
+
+  return {
+    success: true,
+    message: 'Successfully unsubscribed from blog',
+    subscriberCount: blog.subscriberCount,
+    isSubscribed: false
+  };
+}
+
+async getSubscriptionStatus(blogId: string, userId: string) {
+  const blog = await this.blogModel.findById(blogId).select('subscriberIds subscriberCount');
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  return {
+    isSubscribed: blog.subscriberIds.includes(userId),
+    subscriberCount: blog.subscriberCount
+  };
+}
+
+async getSubscriberCount(blogId: string) {
+  const blog = await this.blogModel.findById(blogId).select('subscriberCount');
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  return {
+    subscriberCount: blog.subscriberCount
+  };
+}
+
+async getPopularBlogs(limit: number = 10) {
+  return this.blogModel
+    .find({ isPrivate: false }) 
+    .sort({ subscriberCount: -1 })
+    .limit(limit)
+    .select('title slug description coverImage subscriberCount authorName')
+    .lean()
+    .exec();
+}
+
+
+async getUserSubscriptions(userId: string) {
+  const blogs = await this.blogModel
+    .find({ subscriberIds: userId })
+    .select('title slug description coverImage subscriberCount authorName')
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec();
+
+  return {
+    subscriptions: blogs,
+    total: blogs.length
+  };
+}
 }

@@ -30,10 +30,6 @@ export class CreateBlogDto {
   @IsString({ each: true })
   categories?: string[]; 
 
-  @IsBoolean()
-  @IsOptional()
-  isPrivate?: boolean;
-
   @IsString()
   @IsOptional()
   metaTitle?: string;
