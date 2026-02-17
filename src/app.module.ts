@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import * as Joi from 'joi';
 
 import { AppController } from './app.controller';
@@ -18,7 +19,14 @@ import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
-   
+    EventEmitterModule.forRoot({
+      wildcard: false,
+      delimiter: '.',
+      maxListeners: 10,
+      verboseMemoryLeak: true,
+      ignoreErrors: false,
+    }),
+    
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({

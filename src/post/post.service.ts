@@ -4,11 +4,15 @@ import { Model, Types } from 'mongoose';
 import { Post, PostDocument } from './post.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { NotificationService } from '../notifications/notification.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class PostService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
+    private notificationService: NotificationService,
+  private eventEmitter: EventEmitter2,
   ) {}
 
   private normalizeCategories(categories: string[]): string[] {
@@ -137,7 +141,6 @@ export class PostService {
     .exec();
   }
 
-  // RESTORED: searchCount
   async searchCount(query: string, tenantId: string): Promise<number> {
     if (!Types.ObjectId.isValid(tenantId)) return 0;
     const searchRegex = new RegExp(query, 'i');
@@ -413,4 +416,5 @@ export class PostService {
       .limit(Math.min(Math.max(1, limit), 10))
       .exec();
   }
+
 }

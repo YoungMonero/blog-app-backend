@@ -55,7 +55,6 @@ export class UsersService {
     return this.update(userId, updateData);
   }
 
-  // Remove profile picture
   async removeProfilePicture(userId: string): Promise<UserDocument> {
     return this.update(userId, {
       profilePicture: undefined,

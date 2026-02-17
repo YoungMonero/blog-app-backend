@@ -5,10 +5,6 @@ import { User, UserDocument } from '../users/user.schema';
 import { Post, PostDocument } from '../post/post.schema';
 import { SearchType } from './search.types';
 
-/* ---------------------------------- */
-/* Types */
-/* ---------------------------------- */
-
 export interface SearchResult {
   type: SearchType;
   text: string;

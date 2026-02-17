@@ -10,6 +10,7 @@ import { TenantModule } from '../tenants/tenant.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module' 
 import { BlogsModule } from '../blogs/blogs.module';
 import { PostStatsService } from '../post/post-stats.service'
+import { NotificationModule } from '../notifications/notification.module'; 
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { PostStatsService } from '../post/post-stats.service'
     TenantModule,
     CloudinaryModule,
     BlogsModule,
+    NotificationModule,
   ],
   controllers: [PostController, PublicPostController],
   providers: [PostService, PostStatsService],

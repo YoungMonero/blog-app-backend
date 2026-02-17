@@ -6,6 +6,7 @@ import { DashboardController } from './users.dashboard.controller';
 import {  AuthModule} from '../auth/auth.module';
 import { TenantModule } from 'src/tenants/tenant.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { NotificationModule } from '../notifications/notification.module';  
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
     forwardRef(() => AuthModule),
     forwardRef(() => TenantModule),
     CloudinaryModule,
+    NotificationModule,
   ],
   controllers: [DashboardController],
   providers: [UsersService],
