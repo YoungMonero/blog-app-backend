@@ -64,28 +64,96 @@ export class BlogsService {
     return this.blogModel.find().sort({ createdAt: -1 }).exec();
   }
 
-async getBlogBySlug(slug: string) {
-  const blog = await this.blogModel.findOne({ slug }).lean();
+  async getBlogBySlug(slug: string) {
+    const blog = await this.blogModel.findOne({ slug }).lean();
 
-  if (!blog) {
-    throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
+
+    const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+    const posts = await this.postModel
+      .find({
+        tenantId: tenantObjectId, 
+        status: 'published',
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      ...blog,
+      posts: posts || [],
+    };
   }
 
-  const tenantObjectId = new Types.ObjectId(blog.tenantId);
+  async getPostsByCategory(slug: string, category: string) {
+    const blog = await this.blogModel.findOne({ slug }).lean();
 
-  const posts = await this.postModel
-    .find({
-      tenantId: tenantObjectId, 
-      status: 'published',
-    })
-    .sort({ createdAt: -1 })
-    .lean();
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
 
-  return {
-    ...blog,
-    posts: posts || [],
-  };
-}
+    const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+    const posts = await this.postModel
+      .find({
+        tenantId: tenantObjectId,
+        status: 'published',
+        categories: category,
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      blog: {
+        title: blog.title,
+        slug: blog.slug,
+        categories: blog.categories, 
+      },
+      category,
+      posts: posts || [],
+      count: posts.length,
+    };
+  }
+
+
+  async getBlogCategories(slug: string) {
+    const blog = await this.blogModel.findOne({ slug }).lean();
+
+    if (!blog) {
+      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+    }
+
+    const tenantObjectId = new Types.ObjectId(blog.tenantId);
+
+
+    const categoryStats = await this.postModel.aggregate([
+      {
+        $match: {
+          tenantId: tenantObjectId,
+          status: 'published',
+          categories: { $exists: true, $ne: [] }
+        }
+      },
+      { $unwind: '$categories' },
+      {
+        $group: {
+          _id: '$categories',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    return {
+      blogTitle: blog.title,
+      categories: categoryStats.map(stat => ({
+        name: stat._id,
+        postCount: stat.count
+      }))
+    };
+  }
 
   async updateBlogImages(
     tenantId: string,
@@ -174,4 +242,102 @@ async getBlogBySlug(slug: string) {
       throw new InternalServerErrorException('Image upload failed');
     }
   }
+
+  // ============ SUBSCRIPTION METHODS ============
+
+async subscribe(blogId: string, userId: string) {
+  const blog = await this.blogModel.findById(blogId);
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  if (blog.subscriberIds.includes(userId)) {
+    throw new BadRequestException('Already subscribed to this blog');
+  }
+
+  blog.subscriberIds.push(userId);
+  blog.subscriberCount = blog.subscriberIds.length;
+  await blog.save();
+
+  return {
+    success: true,
+    message: 'Successfully subscribed to blog',
+    subscriberCount: blog.subscriberCount,
+    isSubscribed: true
+  };
+}
+
+async unsubscribe(blogId: string, userId: string) {
+  const blog = await this.blogModel.findById(blogId);
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  if (!blog.subscriberIds.includes(userId)) {
+    throw new BadRequestException('Not subscribed to this blog');
+  }
+
+  blog.subscriberIds = blog.subscriberIds.filter(id => id !== userId);
+  blog.subscriberCount = blog.subscriberIds.length;
+  await blog.save();
+
+  return {
+    success: true,
+    message: 'Successfully unsubscribed from blog',
+    subscriberCount: blog.subscriberCount,
+    isSubscribed: false
+  };
+}
+
+async getSubscriptionStatus(blogId: string, userId: string) {
+  const blog = await this.blogModel.findById(blogId).select('subscriberIds subscriberCount');
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  return {
+    isSubscribed: blog.subscriberIds.includes(userId),
+    subscriberCount: blog.subscriberCount
+  };
+}
+
+async getSubscriberCount(blogId: string) {
+  const blog = await this.blogModel.findById(blogId).select('subscriberCount');
+  
+  if (!blog) {
+    throw new NotFoundException('Blog not found');
+  }
+
+  return {
+    subscriberCount: blog.subscriberCount
+  };
+}
+
+async getPopularBlogs(limit: number = 10) {
+  return this.blogModel
+    .find({ isPrivate: false }) 
+    .sort({ subscriberCount: -1 })
+    .limit(limit)
+    .select('title slug description coverImage subscriberCount authorName')
+    .lean()
+    .exec();
+}
+
+
+async getUserSubscriptions(userId: string) {
+  const blogs = await this.blogModel
+    .find({ subscriberIds: userId })
+    .select('title slug description coverImage subscriberCount authorName')
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec();
+
+  return {
+    subscriptions: blogs,
+    total: blogs.length
+  };
+}
 }

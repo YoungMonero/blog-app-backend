@@ -10,11 +10,13 @@ import { User, UserSchema } from '../users/user.schema';
 import { Tenant, TenantSchema } from '../tenants/tenant.schema';
 import { TenantModule } from '../tenants/tenant.module';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { EmailModule } from '../email/email.module'; 
 
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
+    EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -30,7 +32,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     TenantModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard], // 👈 provide guard here
-  exports: [JwtModule, AuthService, JwtAuthGuard], // 👈 export so BlogsModule can use them
+  providers: [AuthService, JwtAuthGuard], 
+  exports: [JwtModule, AuthService, JwtAuthGuard],
 })
 export class AuthModule {}

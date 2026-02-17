@@ -8,7 +8,14 @@ export class Blog extends Document {
 
   @Prop({ required: true, unique: true })
   slug: string;
+  
+  @Prop({ default: false })
+  isPrivate: boolean;
 
+  @Prop({ default: 0 })
+  subscriberCount: number;
+
+  
   @Prop()
   description: string;
 
@@ -24,16 +31,17 @@ export class Blog extends Document {
   @Prop()
   excerpt: string;
 
-  // ✅ COVER IMAGE (banner)
   @Prop()
   coverImage: string;
 
-  // ✅ PROFILE IMAGE (avatar)
   @Prop()
   profileImage: string;
+  
+  @Prop({ type: [String], default: [] })
+  subscriberIds: string[]; 
 
   @Prop({ type: [String], default: [] })
-  tags: string[];
+  categories: string[];
 
   @Prop({ type: Date })
   publishedAt: Date;
@@ -46,3 +54,6 @@ export class Blog extends Document {
 }
 
 export const BlogSchema = SchemaFactory.createForClass(Blog);
+
+BlogSchema.index({ categories: 1 });
+BlogSchema.index({ tenantId: 1, categories: 1,  subscriberCount: -1 });

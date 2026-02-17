@@ -4,11 +4,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import slugify from 'slugify';
+import * as crypto from 'crypto';
 
 import { User } from '../users/user.schema';
 import { Tenant } from '../tenants/tenant.schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { EmailService } from '../email/email.service'; // Fixed path (emails → email)
 
 @Injectable()
 export class AuthService {
@@ -16,17 +21,16 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Tenant.name) private tenantModel: Model<Tenant>,
     private jwtService: JwtService,
+    private emailService: EmailService, // ✅ ADDED: Email service injection
   ) {}
 
   async register(dto: RegisterDto) {
-    // Email validation
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/i;
     
     if (!emailRegex.test(dto.email)) {
       throw new BadRequestException('Email address should include @ and end with .com (e.g., user@example.com)');
     }
 
-    // Check for existing email and username
     const [existingEmail, existingUsername] = await Promise.all([
       this.userModel.findOne({ email: dto.email }),
       this.userModel.findOne({ username: dto.username }),
@@ -35,10 +39,8 @@ export class AuthService {
     if (existingEmail) throw new ConflictException('Email already in use');
     if (existingUsername) throw new ConflictException('Username already taken');
 
-    // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // Create user
     const user = new this.userModel({
       email: dto.email,
       username: dto.username,
@@ -48,18 +50,15 @@ export class AuthService {
     
     await user.save();
 
-    // Generate unique tenant slug
     const tenantName = dto.username;
     const baseSlug = slugify(tenantName, { lower: true, strict: true });
     let tenantSlug = baseSlug;
     let counter = 1;
 
-    // Check if slug already exists and generate unique one
     while (await this.tenantModel.findOne({ slug: tenantSlug })) {
       tenantSlug = `${baseSlug}-${counter}`;
       counter++;
 
-      // Safety limit
       if (counter > 100) {
         tenantSlug = `${baseSlug}-${Date.now()}`;
         break;
@@ -67,21 +66,18 @@ export class AuthService {
     }
 
     try {
-      // Create tenant with unique slug
       const tenant = new this.tenantModel({
         owner: user._id.toString(),
         userId: user._id.toString(),
         name: tenantName,
-        slug: tenantSlug, // Use the generated unique slug
+        slug: tenantSlug, 
       });
       
       await tenant.save();
 
-      // Update user with tenant ID
       user.tenantId = tenant._id.toString();
       await user.save();
 
-      // Create JWT token
       const tokenPayload = {
         sub: user._id.toString(),
         userId: user._id.toString(),
@@ -109,10 +105,8 @@ export class AuthService {
       };
       
     } catch (error) {
-      // Clean up user if tenant creation fails
       await this.userModel.deleteOne({ _id: user._id });
-      
-      // Handle duplicate error
+
       if (error.code === 11000) {
         const field = Object.keys(error.keyPattern || {})[0];
         const messages = {
@@ -125,8 +119,7 @@ export class AuthService {
           messages[field] || 'Registration conflict. Please try different information.'
         );
       }
-      
-      // Re-throw other errors
+
       throw new BadRequestException(
         `Registration failed: ${error.message || 'Please try again.'}`
       );
@@ -140,12 +133,10 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new BadRequestException('Invalid email or password. Please try again.');
 
-    // Find tenant
     let tenant = await this.tenantModel.findOne({ 
       $or: [{ owner: user._id.toString() }, { userId: user._id.toString() }],
     });
 
-    // If tenant missing, auto-create one with safe fallback
     if (!tenant) {
       const tenantName = user.username || user.email.split('@')[0];
       const tenantSlug = slugify(tenantName, { lower: true, strict: true });
@@ -211,5 +202,123 @@ export class AuthService {
     };
 
     return this.jwtService.sign(tokenPayload);
+  }
+
+  private generateResetCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 7; i++) {
+      if (i === 3) {
+        result += '-';
+      } else {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+    }
+    return result;
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+    
+    const user = await this.userModel.findOne({ email });
+
+    const resetCode = this.generateResetCode();
+    const resetCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+    if (user) {
+      user.resetCode = resetCode;
+      user.resetCodeExpires = resetCodeExpires;
+      await user.save();
+      
+
+      await this.emailService.sendResetCode(email, resetCode);
+      console.log(`[DEV] Reset code for ${email}: ${resetCode}`);
+    }
+
+  
+    return { 
+      message: "We've sent a password reset email to the address associated with your account."
+    };
+  }
+
+  async verifyResetCode(verifyResetCodeDto: VerifyResetCodeDto) {
+    const { email, resetCode } = verifyResetCodeDto;
+
+    const user = await this.userModel.findOne({
+      email,
+      resetCode,
+      resetCodeExpires: { $gt: new Date() }, 
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    return { 
+      success: true,
+      message: 'Code verified successfully' 
+    };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { email, resetCode, newPassword } = resetPasswordDto;
+
+    const user = await this.userModel.findOne({
+      email,
+      resetCode,
+      resetCodeExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    user.passwordHash = hashedPassword;
+    user.resetCode = undefined; 
+    user.resetCodeExpires = undefined;
+    await user.save();
+
+
+    return { 
+      success: true,
+      message: 'Password reset successful. You can now log in with your new password.' 
+    };
+  }
+
+  async checkResetCodeStatus(email: string, resetCode: string) {
+    const user = await this.userModel.findOne({
+      email,
+      resetCode,
+      resetCodeExpires: { $gt: new Date() },
+    });
+
+    return {
+      valid: !!user,
+      expiresAt: user?.resetCodeExpires,
+    };
+  }
+
+  async resendResetCode(email: string) {
+    const user = await this.userModel.findOne({ email });
+    
+    const resetCode = this.generateResetCode();
+    const resetCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+    if (user) {
+      user.resetCode = resetCode;
+      user.resetCodeExpires = resetCodeExpires;
+      await user.save();
+
+
+      await this.emailService.sendResetCode(email, resetCode);
+      console.log(`[DEV] New reset code for ${email}: ${resetCode}`);
+    }
+
+
+    return { 
+      message: "We've sent a password reset email to the address associated with your account."
+    };
   }
 }

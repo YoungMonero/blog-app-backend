@@ -6,7 +6,7 @@ export class ResetPasswordDto {
   @IsEmail({}, { message: 'Please enter a valid email address' })
   @IsNotEmpty()
   email: string;
-
+v
   @ApiProperty({ example: 'WO9-OPS' })
   @IsString()
   @IsNotEmpty()

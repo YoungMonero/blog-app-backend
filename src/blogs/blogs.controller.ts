@@ -1,5 +1,3 @@
-// blogs.controller.ts
-
 import {
   Controller,
   Post,
@@ -13,6 +11,7 @@ import {
   UseInterceptors,
   BadRequestException,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BlogsService } from './blogs.service';
@@ -43,7 +42,7 @@ export class BlogsController {
     return this.blogsService.getBlogBySlug(slug);
   }
 
-  // --- PROTECTED ROUTES (Token Required) ---
+
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -52,7 +51,7 @@ export class BlogsController {
     const authorName = req.user.username || body.authorName || 'Anonymous'; 
     
     return this.blogsService.createBlog(
-      { ...body, authorName }, // Pass the authorName to the service
+      { ...body, authorName }, 
       req.user.tenantId,
       req.user.userId,
     );
@@ -65,7 +64,6 @@ export class BlogsController {
     return { blog: blog ?? null };
   }
 
-  // Update specific images (banner/avatar)
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   async updateMyBlogImages(
@@ -75,7 +73,6 @@ export class BlogsController {
     return this.blogsService.updateBlogImages(req.user.tenantId, body);
   }
 
-  // Update general blog content (title, description, etc.)
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateBlog(
@@ -100,5 +97,41 @@ export class BlogsController {
       throw new BadRequestException('No file uploaded');
     }
     return this.blogsService.uploadBlogImage(file);
+  }
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/subscribe')
+  async subscribe(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.blogsService.subscribe(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/subscribe')
+  async unsubscribe(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.blogsService.unsubscribe(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/subscription-status')
+  async getSubscriptionStatus(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.blogsService.getSubscriptionStatus(id, req.user.userId);
+  }
+
+  @Public()
+  @Get(':id/subscriber-count')
+  async getSubscriberCount(@Param('id') id: string) {
+    return this.blogsService.getSubscriberCount(id);
+  }
+
+  @Public()
+  @Get('popular/all')
+  async getPopularBlogs(@Query('limit') limit?: string) {
+    const limitNum = limit ? parseInt(limit) : 10;
+    return this.blogsService.getPopularBlogs(limitNum);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('user/subscriptions')
+  async getUserSubscriptions(@Req() req: AuthRequest) {
+    return this.blogsService.getUserSubscriptions(req.user.userId);
   }
 }
