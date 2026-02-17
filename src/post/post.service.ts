@@ -348,31 +348,36 @@ export class PostService {
       .exec();
   }
 
-  async findByCategory(
-    category: string,
-    tenantId: string,
-    page: number = 1,
-    limit: number = 10
-  ): Promise<{ posts: PostDocument[]; total: number; totalPages: number }> {
-    if (!Types.ObjectId.isValid(tenantId)) return { posts: [], total: 0, totalPages: 0 };
-    const query = {
-      tenantId: new Types.ObjectId(tenantId),
-      status: 'published',
-      categories: category.toLowerCase().trim()
-    };
-    const total = await this.postModel.countDocuments(query);
-    const validatedLimit = Math.min(Math.max(1, limit), 50);
-    const posts = await this.postModel
-      .find(query)
-      .sort({ publishedAt: -1 })
-      .skip((Math.max(1, page) - 1) * validatedLimit)
-      .limit(validatedLimit)
-      .populate('authorId', 'username email profilePicture displayName bio')
-      .populate('tenantId', 'name slug')
-      .exec();
+async findByCategory(
+  category: string,
+  tenantId?: string, 
+  page: number = 1,  
+  limit: number = 10
+): Promise<{ posts: PostDocument[]; total: number; totalPages: number }> {
+  
+  const query: any = {
+    status: 'published',
+    categories: category.toLowerCase().trim()
+  };
 
-    return { posts, total, totalPages: Math.ceil(total / validatedLimit) };
+  if (tenantId && Types.ObjectId.isValid(tenantId)) {
+    query.tenantId = new Types.ObjectId(tenantId);
   }
+
+  const total = await this.postModel.countDocuments(query);
+  const validatedLimit = Math.min(Math.max(1, limit), 50);
+  
+  const posts = await this.postModel
+    .find(query)
+    .sort({ publishedAt: -1 })
+    .skip((Math.max(1, page) - 1) * validatedLimit)
+    .limit(validatedLimit)
+    .populate('authorId', 'username email profilePicture displayName bio')
+    .populate('tenantId', 'name slug')
+    .exec();
+
+  return { posts, total, totalPages: Math.ceil(total / validatedLimit) };
+}
 
   async remove(id: string, userId: string, tenantId: string): Promise<void> {
     const post = await this.postModel.findById(id);
