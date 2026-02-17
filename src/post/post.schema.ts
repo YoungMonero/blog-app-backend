@@ -26,7 +26,7 @@ export class Post {
   @Prop({ trim: true, minlength: 10, maxlength: 500 })
   excerpt?: string;
 
-  @Prop({ type: [String], default: [] })
+  @Prop({ type: [String], default: ["General"] })
   categories?: string[];
 
   @Prop({ trim: true, minlength: 10, maxlength: 1000 })
