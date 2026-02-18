@@ -272,18 +272,27 @@ export class AuthService {
     if (!user) {
       throw new BadRequestException('Invalid or expired reset code');
     }
-
+    
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
     user.passwordHash = hashedPassword;
     user.resetCode = undefined; 
     user.resetCodeExpires = undefined;
     await user.save();
 
+  const payload = { sub: user._id, email: user.email };
+  const accessToken = this.jwtService.sign(payload);
+
 
     return { 
       success: true,
-      message: 'Password reset successful. You can now log in with your new password.' 
+      message: 'Password reset successful. log in with your new password.',
+      accessToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        hasBlog: true,
+      } 
     };
   }
 

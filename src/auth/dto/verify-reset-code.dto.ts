@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, Length } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyResetCodeDto {
@@ -11,11 +11,15 @@ export class VerifyResetCodeDto {
   email: string;
 
   @ApiProperty({
-    description: '6-digit reset code',
-    example: '123456',
+    description: '7-character reset code with hyphen',
+    example: 'ABC-123',
   })
   @IsString({ message: 'Reset code must be a string' })
   @IsNotEmpty({ message: 'Reset code is required' })
-  @Length(6, 6, { message: 'Reset code must be exactly 6 digits' })
+
+  @Length(7, 7, { message: 'Reset code must be exactly 7 characters (e.g., XXX-XXX)' })
+  @Matches(/^[A-Z0-9]{3}-[A-Z0-9]{3}$/, { 
+    message: 'Reset code must be in the format XXX-XXX' 
+  })
   resetCode: string;
 }
