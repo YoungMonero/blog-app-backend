@@ -14,14 +14,18 @@ import { CreateBlogDto } from './dto/create-blog.dto';
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 import { Types } from 'mongoose';
+import { NotificationService } from '../notifications/notification.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class BlogsService {
   constructor(
-    @InjectModel(Blog.name) 
+    @InjectModel(Blog.name)
     private readonly blogModel: Model<Blog>,
-    @InjectModel('Post') 
+    @InjectModel('Post')
     private readonly postModel: Model<any>,
+    private notificationService: NotificationService, 
+  private eventEmitter: EventEmitter2,
   ) {}
 
   async createBlog(
@@ -36,7 +40,10 @@ export class BlogsService {
       }
 
       const slug = slugify(dto.title, { lower: true, strict: true });
-      const slugExists = await this.blogModel.findOne({ slug });
+      const slugExists = await this.blogModel.findOne({
+        tenantId,
+        slug,
+      });
       if (slugExists) {
         throw new BadRequestException('Blog slug already exists');
       }
@@ -64,23 +71,29 @@ export class BlogsService {
     return this.blogModel.find().sort({ createdAt: -1 }).exec();
   }
 
-  async getBlogBySlug(slug: string) {
-    const blog = await this.blogModel.findOne({ slug }).lean();
-
+  async getBlogBySlug(identifier: string) {
+    // 🔍 SMART QUERY: Look for either the slug OR the authorName
+    const blog = await this.blogModel.findOne({
+      $or: [
+        { slug: identifier },
+        { authorName: identifier }
+      ]
+    }).lean();
+  
     if (!blog) {
-      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+      throw new NotFoundException(`Blog or User "${identifier}" not found`);
     }
-
+  
     const tenantObjectId = new Types.ObjectId(blog.tenantId);
-
+  
     const posts = await this.postModel
       .find({
-        tenantId: tenantObjectId, 
+        tenantId: tenantObjectId,
         status: 'published',
       })
       .sort({ createdAt: -1 })
       .lean();
-
+  
     return {
       ...blog,
       posts: posts || [],
@@ -109,14 +122,13 @@ export class BlogsService {
       blog: {
         title: blog.title,
         slug: blog.slug,
-        categories: blog.categories, 
+        categories: blog.categories,
       },
       category,
       posts: posts || [],
       count: posts.length,
     };
   }
-
 
   async getBlogCategories(slug: string) {
     const blog = await this.blogModel.findOne({ slug }).lean();
@@ -127,31 +139,30 @@ export class BlogsService {
 
     const tenantObjectId = new Types.ObjectId(blog.tenantId);
 
-
     const categoryStats = await this.postModel.aggregate([
       {
         $match: {
           tenantId: tenantObjectId,
           status: 'published',
-          categories: { $exists: true, $ne: [] }
-        }
+          categories: { $exists: true, $ne: [] },
+        },
       },
       { $unwind: '$categories' },
       {
         $group: {
           _id: '$categories',
-          count: { $sum: 1 }
-        }
+          count: { $sum: 1 },
+        },
       },
-      { $sort: { count: -1 } }
+      { $sort: { count: -1 } },
     ]);
 
     return {
       blogTitle: blog.title,
-      categories: categoryStats.map(stat => ({
+      categories: categoryStats.map((stat) => ({
         name: stat._id,
-        postCount: stat.count
-      }))
+        postCount: stat.count,
+      })),
     };
   }
 
@@ -244,100 +255,193 @@ export class BlogsService {
   }
 
   // ============ SUBSCRIPTION METHODS ============
+  async subscribe(blogId: string, userId: string) {
+    const updatedBlog = await this.blogModel.findOneAndUpdate(
+      {
+        _id: blogId,
+        subscriberIds: { $ne: userId },
+      },
+      {
+        $addToSet: { subscriberIds: userId },
+        $inc: { subscriberCount: 1 },
+      },
+      { new: true, runValidators: true },
+    );
 
-async subscribe(blogId: string, userId: string) {
-  const blog = await this.blogModel.findById(blogId);
+    if (!updatedBlog) {
+      const blogExists = await this.blogModel.exists({ _id: blogId });
+      if (!blogExists) {
+        throw new NotFoundException('Blog not found');
+      }
+      throw new BadRequestException('Already subscribed');
+    }
+    if (updatedBlog.authorId !== userId) {
+      await this.notificationService.createNotification({
+        recipientId: updatedBlog.authorId.toString(),
+        actorId: userId,
+        type: 'subscribe',
+        blogId: blogId,
+        content: `started following your blog "${updatedBlog.title}"`,
+      });
+      
+      this.eventEmitter.emit('notification.created', {
+        recipientId: updatedBlog.authorId.toString(),
+        actorId: userId,
+        type: 'subscribe',
+        blogId,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Successfully subscribed to blog',
+      subscriberCount: updatedBlog.subscriberCount,
+      isSubscribed: true,
+    };
+  }
+
+  async notifySubscribersAboutNewPost(blogId: string, newPost: any) {
+    const blog = await this.blogModel
+      .findById(blogId)
+      .select('+subscriberIds authorId');
   
-  if (!blog) {
-    throw new NotFoundException('Blog not found');
-  }
-
-  if (blog.subscriberIds.includes(userId)) {
-    throw new BadRequestException('Already subscribed to this blog');
-  }
-
-  blog.subscriberIds.push(userId);
-  blog.subscriberCount = blog.subscriberIds.length;
-  await blog.save();
-
-  return {
-    success: true,
-    message: 'Successfully subscribed to blog',
-    subscriberCount: blog.subscriberCount,
-    isSubscribed: true
-  };
-}
-
-async unsubscribe(blogId: string, userId: string) {
-  const blog = await this.blogModel.findById(blogId);
+    if (!blog || !blog.subscriberIds || blog.subscriberIds.length === 0) {
+      return;
+    }
   
-  if (!blog) {
-    throw new NotFoundException('Blog not found');
+    await Promise.all(
+      blog.subscriberIds.map((subscriberId) =>
+        this.notificationService.createNotification({
+          recipientId: subscriberId,
+          actorId: blog.authorId,
+          type: 'post',
+          blogId: blog._id.toString(),
+          postId: newPost._id.toString(),
+          content: `published a new post: "${newPost.title}"`,
+        }),
+      ),
+    );
   }
-
-  if (!blog.subscriberIds.includes(userId)) {
-    throw new BadRequestException('Not subscribed to this blog');
-  }
-
-  blog.subscriberIds = blog.subscriberIds.filter(id => id !== userId);
-  blog.subscriberCount = blog.subscriberIds.length;
-  await blog.save();
-
-  return {
-    success: true,
-    message: 'Successfully unsubscribed from blog',
-    subscriberCount: blog.subscriberCount,
-    isSubscribed: false
-  };
-}
-
-async getSubscriptionStatus(blogId: string, userId: string) {
-  const blog = await this.blogModel.findById(blogId).select('subscriberIds subscriberCount');
   
-  if (!blog) {
-    throw new NotFoundException('Blog not found');
+
+  async updateNotificationPreferences(
+    blogId: string,
+    authorId: string,
+    preferences: { newPosts?: boolean; comments?: boolean; likes?: boolean }
+  ) {
+    const blog = await this.blogModel.findOne({ _id: blogId, authorId });
+    
+    if (!blog) {
+      throw new NotFoundException('Blog not found');
+    }
+    
+    blog.notificationPreferences = {
+      ...blog.notificationPreferences,
+      ...preferences
+    };
+    
+    await blog.save();
+    
+    return {
+      message: 'Notification preferences updated',
+      preferences: blog.notificationPreferences
+    };
   }
 
-  return {
-    isSubscribed: blog.subscriberIds.includes(userId),
-    subscriberCount: blog.subscriberCount
-  };
-}
-
-async getSubscriberCount(blogId: string) {
-  const blog = await this.blogModel.findById(blogId).select('subscriberCount');
-  
-  if (!blog) {
-    throw new NotFoundException('Blog not found');
+  async getNotificationPreferences(blogId: string, authorId: string) {
+    const blog = await this.blogModel
+      .findOne({ _id: blogId, authorId })
+      .select('notificationPreferences');
+    
+    if (!blog) {
+      throw new NotFoundException('Blog not found');
+    }
+    
+    return {
+      preferences: blog.notificationPreferences || {
+        newPosts: true,
+        comments: true,
+        likes: true
+      }
+    };
   }
 
-  return {
-    subscriberCount: blog.subscriberCount
-  };
-}
+  async unsubscribe(blogId: string, userId: string) {
+    const updatedBlog = await this.blogModel.findOneAndUpdate(
+      {
+        _id: blogId,
+        subscriberIds: userId,
+        subscriberCount: { $gt: 0 }, 
+      },
+      {
+        $pull: { subscriberIds: userId },
+        $inc: { subscriberCount: -1 },
+      },
+      { new: true },
+    );
 
-async getPopularBlogs(limit: number = 10) {
-  return this.blogModel
-    .find({ isPrivate: false }) 
-    .sort({ subscriberCount: -1 })
-    .limit(limit)
-    .select('title slug description coverImage subscriberCount authorName')
-    .lean()
-    .exec();
-}
+    if (!updatedBlog) {
+      throw new BadRequestException('Not subscribed or blog not found');
+    }
 
+    return {
+      success: true,
+      message: 'Successfully unsubscribed from blog',
+      subscriberCount: updatedBlog.subscriberCount,
+      isSubscribed: false,
+    };
+  }
 
-async getUserSubscriptions(userId: string) {
-  const blogs = await this.blogModel
-    .find({ subscriberIds: userId })
-    .select('title slug description coverImage subscriberCount authorName')
-    .sort({ createdAt: -1 })
-    .lean()
-    .exec();
+  async getSubscriptionStatus(blogId: string, userId: string) {
+    const blog = await this.blogModel
+      .findById(blogId)
+      .select('+subscriberIds subscriberCount');
 
-  return {
-    subscriptions: blogs,
-    total: blogs.length
-  };
-}
+    if (!blog) {
+      throw new NotFoundException('Blog not found');
+    }
+
+    return {
+      isSubscribed: blog.subscriberIds.includes(userId),
+      subscriberCount: blog.subscriberCount,
+    };
+  }
+
+  async getSubscriberCount(blogId: string) {
+    const blog = await this.blogModel
+      .findById(blogId)
+      .select('subscriberCount');
+
+    if (!blog) {
+      throw new NotFoundException('Blog not found');
+    }
+
+    return {
+      subscriberCount: blog.subscriberCount,
+    };
+  }
+
+  async getPopularBlogs(limit: number = 10) {
+    return this.blogModel
+      .find({ isPrivate: false })
+      .sort({ subscriberCount: -1 })
+      .limit(limit)
+      .select('title slug description coverImage subscriberCount authorName')
+      .lean()
+      .exec();
+  }
+
+  async getUserSubscriptions(userId: string) {
+    const blogs = await this.blogModel
+      .find({ subscriberIds: userId })
+      .select('title slug description coverImage subscriberCount authorName')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    return {
+      subscriptions: blogs,
+      total: blogs.length,
+    };
+  }
 }

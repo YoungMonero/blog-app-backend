@@ -32,17 +32,35 @@ export class BlogsController {
     return this.blogsService.getBlogBySlug(slug);
   }
 
+  @Public()
   @Get()
   async getAllBlogs() {
     return this.blogsService.findAllPublished();
   }
 
+  // Add these to BlogsController.ts
+
+@UseGuards(JwtAuthGuard)
+@Get(':id/notification-preferences')
+async getNotificationPreferences(@Param('id') id: string, @Req() req: AuthRequest) {
+  return this.blogsService.getNotificationPreferences(id, req.user.userId);
+}
+
+@UseGuards(JwtAuthGuard)
+@Patch(':id/notification-preferences')
+async updateNotificationPreferences(
+  @Param('id') id: string,
+  @Body() body: { newPosts?: boolean; comments?: boolean; likes?: boolean },
+  @Req() req: AuthRequest,
+) {
+  return this.blogsService.updateNotificationPreferences(id, req.user.userId, body);
+}
+
+@Public()
   @Get('post/:slug')
   async getBlogBySlug(@Param('slug') slug: string) {
     return this.blogsService.getBlogBySlug(slug);
   }
-
-
 
   @UseGuards(JwtAuthGuard)
   @Post()
