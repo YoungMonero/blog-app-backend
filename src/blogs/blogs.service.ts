@@ -71,15 +71,21 @@ export class BlogsService {
     return this.blogModel.find().sort({ createdAt: -1 }).exec();
   }
 
-  async getBlogBySlug(slug: string) {
-    const blog = await this.blogModel.findOne({ slug }).lean();
-
+  async getBlogBySlug(identifier: string) {
+    // 🔍 SMART QUERY: Look for either the slug OR the authorName
+    const blog = await this.blogModel.findOne({
+      $or: [
+        { slug: identifier },
+        { authorName: identifier }
+      ]
+    }).lean();
+  
     if (!blog) {
-      throw new NotFoundException(`Blog with slug "${slug}" not found`);
+      throw new NotFoundException(`Blog or User "${identifier}" not found`);
     }
-
+  
     const tenantObjectId = new Types.ObjectId(blog.tenantId);
-
+  
     const posts = await this.postModel
       .find({
         tenantId: tenantObjectId,
@@ -87,7 +93,7 @@ export class BlogsService {
       })
       .sort({ createdAt: -1 })
       .lean();
-
+  
     return {
       ...blog,
       posts: posts || [],
