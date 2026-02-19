@@ -191,28 +191,6 @@ export class BlogsService {
     return blog.save();
   }
 
-  // async updateBlog(
-  //   id: string,
-  //   tenantId: string,
-  //   updateData: Partial<CreateBlogDto>,
-  // ) {
-  //   const updatedBlog = await this.blogModel
-  //     .findOneAndUpdate(
-  //       { _id: id, tenantId },
-  //       { $set: updateData },
-  //       { new: true },
-  //     )
-  //     .exec();
-
-  //   if (!updatedBlog) {
-  //     throw new NotFoundException(
-  //       'Blog not found or you do not have permission to edit it',
-  //     );
-  //   }
-
-  //   return updatedBlog;
-  // }
-
   async deleteBlog(id: string, tenantId: string) {
     const result = await this.blogModel.deleteOne({ _id: id, tenantId }).exec();
 
@@ -445,7 +423,6 @@ export class BlogsService {
     };
   }
 
-
   async updateMyBlog(tenantId: string, dto: UpdateBlogDto) {
     const blog = await this.blogModel.findOne({ tenantId });
     if (!blog) throw new NotFoundException('Blog not found');
@@ -482,6 +459,4 @@ export class BlogsService {
     return await blog.save();
   }
 }
-  // 
-
 
