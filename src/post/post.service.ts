@@ -7,6 +7,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { NotificationService } from '../notifications/notification.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+
 @Injectable()
 export class PostService {
   constructor(
@@ -119,6 +120,47 @@ export class PostService {
       status: 'published'
     });
   }
+
+async toggleLike(postId: string, userId: string) {
+  const post = await this.postModel.findById(postId);
+  
+  if (!post) {
+    throw new NotFoundException('Post not found');
+  }
+
+  // 1. Ensure the array exists
+  if (!post.likedBy) {
+    post.likedBy = [];
+  }
+
+  const userIndex = post.likedBy.findIndex(id => id.toString() === userId.toString());
+  const wasLiked = userIndex !== -1;
+
+  if (!wasLiked) {
+    post.likedBy.push(userId);
+  } else {
+    post.likedBy.splice(userIndex, 1);
+  }
+
+  post.likes = post.likedBy.length;
+  
+  await post.save();
+
+  if (!wasLiked && post.authorId.toString() !== userId) {
+    await this.notificationService.createNotification({
+      recipientId: post.authorId.toString(),
+      actorId: userId,
+      type: 'like',
+      postId: postId,
+      content: `liked your post "${post.title?.substring(0, 30)}..."`,
+    });
+  }
+
+  return {
+    liked: !wasLiked,
+    likes: post.likes,
+  };
+}
 
   // RESTORED: search
   async search(query: string, tenantId: string, skip = 0, limit = 10): Promise<PostDocument[]> {
@@ -391,13 +433,21 @@ async findByCategory(
     await this.postModel.deleteOne({ _id: id });
   }
 
-  async findByIdOrSlug(identifier: string): Promise<PostDocument | null> {
-    const isId = /^[0-9a-fA-F]{24}$/.test(identifier);
-    const query = isId ? { _id: new Types.ObjectId(identifier) } : { slug: identifier };
-    return this.postModel.findOne(query)
-      .populate('authorId', 'username email profilePicture')
-      .exec();
-  }
+async findByIdOrSlug(identifier: string, userId?: string): Promise<any> {
+  const query = /^[0-9a-fA-F]{24}$/.test(identifier) 
+    ? { _id: new Types.ObjectId(identifier) } 
+    : { slug: identifier };
+
+  const post = await this.postModel.findOne(query).lean().exec();
+
+  if (!post) return null;
+
+  return {
+    ...post,
+    isLikedByMe: userId ? post.likedBy?.some(id => id.toString() === userId) : false,
+    likesCount: post.likedBy?.length || 0
+  };
+}
 
   async getPopularPosts(limit: number = 5) {
     return this.postModel
@@ -421,5 +471,4 @@ async findByCategory(
       .limit(Math.min(Math.max(1, limit), 10))
       .exec();
   }
-
 }

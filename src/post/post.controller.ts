@@ -20,7 +20,7 @@ export class PostController {
   constructor(
     private readonly postService: PostService,
     private readonly cloudinaryService: CloudinaryService
-  ) {}
+  ) { }
 
   @Post('thumbnail')
   @UseGuards(JwtAuthGuard, HasBlogGuard)
@@ -39,9 +39,9 @@ export class PostController {
   ) {
     try {
       this.logger.log(`Uploading thumbnail for user: ${req.user?.userId || req.user?.sub}`);
-      
+
       const upload = await this.cloudinaryService.uploadImage(file, 'blog-posts');
-      
+
       this.logger.log(`Thumbnail uploaded successfully: ${upload.url}`);
 
       return {
@@ -66,7 +66,7 @@ export class PostController {
       if (!createPostDto.title || !createPostDto.content) {
         throw new BadRequestException('Title and content are required');
       }
-      
+
       const authorId = createPostDto.authorId || req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
 
@@ -74,9 +74,9 @@ export class PostController {
       if (!tenantId) throw new ForbiddenException('No blog/tenant associated with this account.');
 
       const result = await this.postService.create(createPostDto, authorId, tenantId);
-      
+
       this.logger.log(`Post created successfully: ${result._id}`);
-      
+
       return {
         success: true,
         message: 'Post created successfully',
@@ -90,13 +90,13 @@ export class PostController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string, 
-    @Body() updatePostDto: UpdatePostDto, 
+    @Param('id') id: string,
+    @Body() updatePostDto: UpdatePostDto,
     @Req() req
   ) {
     try {
       this.logger.log(`Updating post: ${id}`);
-      
+
       // Validation - check categories instead of tags
       if (updatePostDto.categories && !Array.isArray(updatePostDto.categories)) {
         throw new BadRequestException('Categories must be an array');
@@ -116,11 +116,11 @@ export class PostController {
       // Check authorization BEFORE any operations
       const userIdObj = new (require('mongoose').Types.ObjectId)(userId);
       const tenantIdObj = new (require('mongoose').Types.ObjectId)(tenantId);
-      
+
       if (!currentPost.authorId.equals(userIdObj)) {
         throw new ForbiddenException('You do not have permission to update this post');
       }
-      
+
       if (!currentPost.tenantId.equals(tenantIdObj)) {
         throw new ForbiddenException('You do not have permission to update this post');
       }
@@ -148,7 +148,7 @@ export class PostController {
 
       // Perform the update first
       const result = await this.postService.update(id, updateData, userId, tenantId);
-      
+
       // Delete old thumbnail only after successful update
       if (shouldDeleteOldThumbnail && oldThumbnailPublicId) {
         try {
@@ -174,60 +174,67 @@ export class PostController {
   async findAll(@Req() req) {
     const tenantId = req.user.tenantId;
     if (!tenantId) throw new ForbiddenException('Access denied: No tenant ID found in token.');
-    
+
     // This should still filter by tenant for dashboard view
     const posts = await this.postService.findAllByTenant(tenantId);
     return { success: true, count: posts.length, data: posts };
+  }
+
+@Post(':postId/like')
+  @UseGuards(JwtAuthGuard) 
+  async toggleLike(@Param('postId') postId: string, @Req() req) {
+    const userId = req.user.sub || req.user.userId;
+    return this.postService.toggleLike(postId, userId);
   }
 
   @Get(':identifier')
   async findOne(@Param('identifier') identifier: string, @Req() req) {
     const userId = req.user?.sub || req.user?.userId;
     const tenantId = req.user?.tenantId;
-  
+
     // Find the post
     const post = await this.postService.findByIdOrSlug(identifier);
-    
+
     if (!post) throw new NotFoundException('Post not found');
-    
+
     // For draft posts, enforce stricter security
     if (post.status === 'draft') {
       if (!userId) {
         throw new ForbiddenException('Authentication required to view draft posts');
       }
-      
+
       // Check both author AND tenant membership
       const userIdObj = new (require('mongoose').Types.ObjectId)(userId);
       const tenantIdObj = new (require('mongoose').Types.ObjectId)(tenantId);
-      
+
       if (!post.authorId.equals(userIdObj)) {
         throw new ForbiddenException('You do not have permission to view this draft');
       }
-      
+
       if (tenantId && !post.tenantId.equals(tenantIdObj)) {
         throw new ForbiddenException('You do not have permission to view this draft');
       }
     }
-    
+
     return { success: true, data: post };
   }
 
   @Post(':postId/view')
   @UseGuards(JwtAuthGuard)
-async incrementView(@Param('postId') postId: string,  @Req() req) {
-  const userId = req.user.sub || req.user.userId;
-  if (!userId) {
-    throw new UnauthorizedException('User ID not found in token');
+  async incrementView(@Param('postId') postId: string, @Req() req) {
+    const userId = req.user.sub || req.user.userId;
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found in token');
+    }
+    return this.postService.incrementViews(postId, userId);
   }
-  return this.postService.incrementViews(postId, userId);
-  }
-  
+
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req) {
     try {
       const userId = req.user.sub || req.user.userId;
       const tenantId = req.user.tenantId;
-      
+
       if (!tenantId) throw new ForbiddenException('Access denied: Missing tenant context.');
 
       const post = await this.postService.findOne(id);
@@ -237,11 +244,11 @@ async incrementView(@Param('postId') postId: string,  @Req() req) {
 
       const userIdObj = new (require('mongoose').Types.ObjectId)(userId);
       const tenantIdObj = new (require('mongoose').Types.ObjectId)(tenantId);
-      
+
       if (!post.authorId.equals(userIdObj)) {
         throw new ForbiddenException('You do not have permission to delete this post');
       }
-      
+
       if (!post.tenantId.equals(tenantIdObj)) {
         throw new ForbiddenException('You do not have permission to delete this post');
       }
@@ -256,7 +263,7 @@ async incrementView(@Param('postId') postId: string,  @Req() req) {
       }
 
       await this.postService.remove(id, userId, tenantId);
-      
+
       return { success: true, message: 'Post deleted successfully' };
     } catch (error) {
       this.logger.error('Delete Post Error:', error.message, error.stack);
