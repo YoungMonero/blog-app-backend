@@ -83,13 +83,25 @@ export class CommentsService {
   }
   
 
-  async findByPost(postId: string) {
-    return this.commentModel
-      .find({ postId: new Types.ObjectId(postId) })
-      .sort({ createdAt: -1 })
-      .exec();
-  }
+  async findByPost(postId: string, userId?: string) {
+  const comments = await this.commentModel
+    .find({ postId: new Types.ObjectId(postId) })
+    .sort({ createdAt: -1 })
+    .lean() 
+    .exec();
 
+  return comments.map(comment => {
+    const isLikedByMe = userId 
+      ? comment.likedBy?.some(id => id.toString() === userId) 
+      : false;
+
+    return {
+      ...comment,
+      isLikedByMe,
+      likesCount: comment.likedBy?.length || 0,
+    };
+  });
+}
   async toggleCommentLike(commentId: string, userId: string) {
     const comment = await this.commentModel.findById(commentId);
     

@@ -4,9 +4,9 @@ import { CommentsService } from './comments.service';
 
 @Controller('posts/:postId')
 export class CommentsController {
-  constructor(private readonly commentsService: CommentsService) {}
+  constructor(private readonly commentsService: CommentsService) { }
 
-  @Post('comments') 
+  @Post('comments')
   @UseGuards(JwtAuthGuard)
   async addComment(
     @Param('postId') postId: string,
@@ -27,12 +27,26 @@ export class CommentsController {
     });
   }
 
-  @Get('comments')  
-  async getComments(@Param('postId') postId: string) {
-    return this.commentsService.findByPost(postId);
+@Get('comments')  
+async getComments(@Param('postId') postId: string, @Req() req: any) {
+  const authHeader = req.headers.authorization;
+  // CHANGE: Set this to undefined instead of null
+  let userId: string | undefined = undefined; 
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded: any = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      userId = decoded.sub || decoded.userId;
+    } catch (e) {
+      userId = undefined;
+    }
   }
 
-  @Post('like')  
+  return this.commentsService.findByPost(postId, userId);
+}
+
+  @Post('like')
   @UseGuards(JwtAuthGuard)
   async toggleLike(@Param('postId') postId: string, @Req() req) {
     const userId = req.user.sub || req.user.userId;
