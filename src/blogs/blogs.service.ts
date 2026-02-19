@@ -16,7 +16,7 @@ import { Readable } from 'stream';
 import { Types } from 'mongoose';
 import { NotificationService } from '../notifications/notification.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
+import { UpdateBlogDto } from './dto/update-blog.dto';
 @Injectable()
 export class BlogsService {
   constructor(
@@ -31,6 +31,7 @@ export class BlogsService {
   async createBlog(
     dto: CreateBlogDto & { authorName: string },
     tenantId: string,
+
     authorId: string,
   ) {
     try {
@@ -190,27 +191,27 @@ export class BlogsService {
     return blog.save();
   }
 
-  async updateBlog(
-    id: string,
-    tenantId: string,
-    updateData: Partial<CreateBlogDto>,
-  ) {
-    const updatedBlog = await this.blogModel
-      .findOneAndUpdate(
-        { _id: id, tenantId },
-        { $set: updateData },
-        { new: true },
-      )
-      .exec();
+  // async updateBlog(
+  //   id: string,
+  //   tenantId: string,
+  //   updateData: Partial<CreateBlogDto>,
+  // ) {
+  //   const updatedBlog = await this.blogModel
+  //     .findOneAndUpdate(
+  //       { _id: id, tenantId },
+  //       { $set: updateData },
+  //       { new: true },
+  //     )
+  //     .exec();
 
-    if (!updatedBlog) {
-      throw new NotFoundException(
-        'Blog not found or you do not have permission to edit it',
-      );
-    }
+  //   if (!updatedBlog) {
+  //     throw new NotFoundException(
+  //       'Blog not found or you do not have permission to edit it',
+  //     );
+  //   }
 
-    return updatedBlog;
-  }
+  //   return updatedBlog;
+  // }
 
   async deleteBlog(id: string, tenantId: string) {
     const result = await this.blogModel.deleteOne({ _id: id, tenantId }).exec();
@@ -254,7 +255,6 @@ export class BlogsService {
     }
   }
 
-  // ============ SUBSCRIPTION METHODS ============
   async subscribe(blogId: string, userId: string) {
     const updatedBlog = await this.blogModel.findOneAndUpdate(
       {
@@ -444,4 +444,44 @@ export class BlogsService {
       total: blogs.length,
     };
   }
+
+
+  async updateMyBlog(tenantId: string, dto: UpdateBlogDto) {
+    const blog = await this.blogModel.findOne({ tenantId });
+    if (!blog) throw new NotFoundException('Blog not found');
+  
+
+    if (!dto.slug && !dto.title) {
+      dto.slug = blog.slug;
+    }
+  
+
+    if (dto.slug && dto.slug !== blog.slug) {
+      const slugExists = await this.blogModel.findOne({ 
+        slug: dto.slug,
+        _id: { $ne: blog._id } 
+      });
+      if (slugExists) throw new BadRequestException('This URL slug is already taken');
+    }
+  
+
+    if (dto.title && !dto.slug) {
+      const newSlug = slugify(dto.title, { lower: true, strict: true });
+      const slugExists = await this.blogModel.findOne({ slug: newSlug, _id: { $ne: blog._id } });
+      dto.slug = slugExists ? `${newSlug}-${Date.now()}` : newSlug;
+    }
+  
+
+    Object.assign(blog, dto);
+    
+
+    if (!blog.slug) {
+      blog.slug = slugify(blog.title, { lower: true, strict: true });
+    }
+  
+    return await blog.save();
+  }
 }
+  // 
+
+
