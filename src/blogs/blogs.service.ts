@@ -31,10 +31,13 @@ export class BlogsService {
   async createBlog(
     dto: CreateBlogDto & { authorName: string },
     tenantId: string,
-
     authorId: string,
   ) {
     try {
+      if (!tenantId || tenantId === 'null') {
+        throw new BadRequestException('Invalid Tenant ID. Please re-login.');
+      }
+      
       const existingBlog = await this.blogModel.findOne({ tenantId });
       if (existingBlog) {
         throw new BadRequestException('You already have a blog');
@@ -73,7 +76,6 @@ export class BlogsService {
   }
 
   async getBlogBySlug(identifier: string) {
-    // 🔍 SMART QUERY: Look for either the slug OR the authorName
     const blog = await this.blogModel.findOne({
       $or: [
         { slug: identifier },
@@ -83,8 +85,7 @@ export class BlogsService {
   
     if (!blog) {
       throw new NotFoundException(`Blog or User "${identifier}" not found`);
-    }
-  
+    }  
     const tenantObjectId = new Types.ObjectId(blog.tenantId);
   
     const posts = await this.postModel

@@ -52,7 +52,6 @@ export class Blog extends Document {
   }) 
   subscriberIds: string[];
 
-  // ✅ Add subscriber notification preferences
   @Prop({ 
     type: Object, 
     default: { 
@@ -82,7 +81,7 @@ export class Blog extends Document {
 
 export const BlogSchema = SchemaFactory.createForClass(Blog);
 
-// Existing indexes
+
 BlogSchema.index({ title: 'text', description: 'text', excerpt: 'text' });
 BlogSchema.index({ tenantId: 1, slug: 1 }, { unique: true });
 BlogSchema.index({ categories: 1 });
