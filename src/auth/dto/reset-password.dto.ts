@@ -6,7 +6,7 @@ export class ResetPasswordDto {
   @IsEmail({}, { message: 'Please enter a valid email address' })
   @IsNotEmpty()
   email: string;
-v
+
   @ApiProperty({ example: 'WO9-OPS' })
   @IsString()
   @IsNotEmpty()
@@ -18,6 +18,6 @@ v
   @ApiProperty({ example: 'NewPassword123!' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8, { message: 'New password must be at least 8 characters' })
+  @MinLength(6, { message: 'New password must be at least 6 characters' })
   newPassword: string;
 }
