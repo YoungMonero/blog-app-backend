@@ -135,4 +135,59 @@ export class UsersService {
       .limit(limit)
       .exec();
   }
+
+  // Add this method to find or create Google users
+async findOrCreateFromGoogle(googleData: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  picture: string;
+  username: string;
+  displayName: string;
+}): Promise<UserDocument> {
+  let user = await this.findByEmail(googleData.email);
+  
+  if (user) {
+    // Update existing user with latest Google data
+    user.firstName = googleData.firstName;
+    user.lastName = googleData.lastName;
+    user.picture = googleData.picture;
+    user.displayName = googleData.displayName;
+    user.profilePicture = googleData.picture; // Keep both in sync
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    
+    return user.save();
+  }
+  
+  // Create new user
+  const newUser = new this.userModel({
+    email: googleData.email,
+    username: googleData.username,
+    firstName: googleData.firstName,
+    lastName: googleData.lastName,
+    picture: googleData.picture,
+    profilePicture: googleData.picture, // Sync both picture fields
+    displayName: googleData.displayName,
+    isEmailVerified: true,
+    role: 'reader',
+    loginCount: 1,
+    lastLoginAt: new Date(),
+  });
+  
+  return newUser.save();
+}
+
+async syncGooglePicture(userId: string, googlePictureUrl: string): Promise<UserDocument> {
+  return this.update(userId, {
+    picture: googlePictureUrl,
+    profilePicture: googlePictureUrl, 
+  });
+}
+
+
+async isGoogleUser(userId: string): Promise<boolean> {
+  const user = await this.findById(userId);
+  return user ? !user.passwordHash : false;
+}
 }

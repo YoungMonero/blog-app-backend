@@ -13,7 +13,8 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { EmailService } from '../email/email.service'; // Fixed path (emails → email)
+import { EmailService } from '../email/email.service'; 
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
@@ -21,7 +22,8 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Tenant.name) private tenantModel: Model<Tenant>,
     private jwtService: JwtService,
-    private emailService: EmailService, // ✅ ADDED: Email service injection
+    private emailService: EmailService,
+    private usersService: UsersService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -129,18 +131,26 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ email: dto.email });
     if (!user) throw new BadRequestException('Account does not exist');
-
+  
+    // Check if user has a password (not a Google-only user)
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'This account uses Google Sign-In. Please login with Google.'
+      );
+    }
+  
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new BadRequestException('Invalid email or password. Please try again.');
-
+  
+    // Rest of your login logic...
     let tenant = await this.tenantModel.findOne({ 
       $or: [{ owner: user._id.toString() }, { userId: user._id.toString() }],
     });
-
+  
     if (!tenant) {
       const tenantName = user.username || user.email.split('@')[0];
       const tenantSlug = slugify(tenantName, { lower: true, strict: true });
-
+  
       tenant = new this.tenantModel({
         owner: user._id.toString(),
         userId: user._id.toString(),
@@ -148,15 +158,15 @@ export class AuthService {
         slug: tenantSlug,
       });
       await tenant.save();
-
+  
       user.tenantId = tenant._id.toString();
       user.role = 'author';
       await user.save();
     }
-
+  
     const hasBlog = true;
     const role = 'author';
-
+  
     const tokenPayload = {
       sub: user._id.toString(),
       userId: user._id.toString(),
@@ -166,9 +176,9 @@ export class AuthService {
       hasBlog,
       tenantId: user.tenantId || tenant._id.toString(),
     };
-
+  
     const token = this.jwtService.sign(tokenPayload);
-
+  
     return {
       accessToken: token,
       user: {
@@ -262,13 +272,13 @@ export class AuthService {
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { email, resetCode, newPassword } = resetPasswordDto;
-
+  
     const user = await this.userModel.findOne({
       email,
       resetCode,
       resetCodeExpires: { $gt: new Date() },
     });
-
+  
     if (!user) {
       throw new BadRequestException('Invalid or expired reset code');
     }
@@ -278,11 +288,10 @@ export class AuthService {
     user.resetCode = undefined; 
     user.resetCodeExpires = undefined;
     await user.save();
-
-  const payload = { sub: user._id, email: user.email };
-  const accessToken = this.jwtService.sign(payload);
-
-
+  
+    const payload = { sub: user._id, email: user.email };
+    const accessToken = this.jwtService.sign(payload);
+  
     return { 
       success: true,
       message: 'Password reset successful. log in with your new password.',
@@ -330,4 +339,75 @@ export class AuthService {
       message: "We've sent a password reset email to the address associated with your account."
     };
   }
+//
+async validateGoogleUser(googleUser: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  picture: string;
+}) {
+  const { email, firstName, lastName, picture } = googleUser;
+
+  // Generate username
+  const baseUsername = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let username = baseUsername;
+  let counter = 1;
+  
+  while (await this.userModel.findOne({ username })) {
+    username = `${baseUsername}${counter}`;
+    counter++;
+    if (counter > 100) {
+      username = `${baseUsername}${Date.now()}`;
+      break;
+    }
+  }
+
+  // Use the new UsersService method
+  const user = await this.usersService.findOrCreateFromGoogle({
+    email,
+    firstName,
+    lastName,
+    picture,
+    username,
+    displayName: `${firstName} ${lastName}`.trim(),
+  });
+
+  // Check for tenant/blog
+  const tenant = await this.tenantModel.findOne({
+    $or: [{ owner: user._id.toString() }, { userId: user._id.toString() }]
+  });
+
+  const hasBlog = !!tenant;
+  const role = user.role || (hasBlog ? 'author' : 'reader');
+
+  // Generate JWT
+  const tokenPayload = {
+    sub: user._id.toString(),
+    userId: user._id.toString(),
+    email: user.email,
+    username: user.username,
+    role: role,
+    hasBlog: hasBlog,
+    tenantId: tenant?._id.toString() || user.tenantId || null,
+  };
+
+  const accessToken = this.jwtService.sign(tokenPayload);
+
+  return {
+    accessToken,
+    user: {
+      id: user._id,
+      userId: user._id.toString(),
+      email: user.email,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      displayName: user.displayName,
+      picture: user.picture,
+      role: role,
+      hasBlog: hasBlog,
+      tenantId: tenant?._id || user.tenantId || null,
+    },
+  };
 }
+};

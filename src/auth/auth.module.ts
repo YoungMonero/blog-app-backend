@@ -11,11 +11,13 @@ import { Tenant, TenantSchema } from '../tenants/tenant.schema';
 import { TenantModule } from '../tenants/tenant.module';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { EmailModule } from '../email/email.module'; 
+import { GoogleStrategy } from './strategies/google.strategy'; 
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     ConfigModule,
-    PassportModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }), 
     EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -30,9 +32,14 @@ import { EmailModule } from '../email/email.module';
       { name: Tenant.name, schema: TenantSchema },
     ]),
     TenantModule,
+    UsersModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard], 
+  providers: [
+    AuthService, 
+    JwtAuthGuard, 
+    GoogleStrategy
+  ], 
   exports: [JwtModule, AuthService, JwtAuthGuard],
 })
 export class AuthModule {}

@@ -441,7 +441,6 @@ export class BlogsService {
       if (slugExists) throw new BadRequestException('This URL slug is already taken');
     }
   
-
     if (dto.title && !dto.slug) {
       const newSlug = slugify(dto.title, { lower: true, strict: true });
       const slugExists = await this.blogModel.findOne({ slug: newSlug, _id: { $ne: blog._id } });
