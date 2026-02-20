@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, UseGuards, Req, Delete } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommentsService } from './comments.service';
 
@@ -30,7 +30,7 @@ export class CommentsController {
 @Get('comments')  
 async getComments(@Param('postId') postId: string, @Req() req: any) {
   const authHeader = req.headers.authorization;
-  // CHANGE: Set this to undefined instead of null
+
   let userId: string | undefined = undefined; 
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -51,6 +51,19 @@ async getComments(@Param('postId') postId: string, @Req() req: any) {
   async toggleLike(@Param('postId') postId: string, @Req() req) {
     const userId = req.user.sub || req.user.userId;
     return this.commentsService.toggleLike(postId, userId);
+  }
+
+  @Delete('comments/:commentId')
+  @UseGuards(JwtAuthGuard)
+  async deleteComment(
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+    @Req() req,
+  ) {
+    const userId = req.user.sub || req.user.userId;
+    const userRole = req.user.role || 'reader';
+    
+    return this.commentsService.deleteComment(commentId, postId, userId, userRole);
   }
 
   @Post('comments/:commentId/like')

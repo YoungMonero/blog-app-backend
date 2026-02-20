@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Comment } from './comment.schema';
@@ -136,6 +136,85 @@ export class CommentsService {
       liked: userIndex === -1,
       likes: comment.likes,
     };
+  }
+
+  async deleteComment(commentId: string, postId: string, userId: string, userRole: string) {
+    const comment = await this.commentModel.findById(commentId);
+    
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    // Check if user is authorized to delete (owner, admin, or author)
+    const isOwner = comment.userId.toString() === userId;
+    const isAdmin = userRole === 'admin';
+    const isModerator = userRole === 'moderator';
+
+    if (!isOwner && !isAdmin && !isModerator) {
+      throw new ForbiddenException('You do not have permission to delete this comment');
+    }
+
+    // Start a session for transaction
+    const session = await this.commentModel.db.startSession();
+    session.startTransaction();
+
+    try {
+      // If this is a parent comment with replies, delete all replies first
+      if (!comment.parentCommentId) {
+        await this.commentModel.deleteMany({ 
+          parentCommentId: commentId 
+        }).session(session);
+      }
+
+      // Delete the comment
+      await comment.deleteOne({ session });
+
+      // Update post's comment count
+      const replyCount = comment.parentCommentId ? 0 : 1; // Only decrement for parent comments
+      const repliesToDecrement = comment.parentCommentId ? 0 : await this.commentModel.countDocuments({ 
+        parentCommentId: commentId 
+      });
+
+      await this.postModel.findByIdAndUpdate(
+        postId,
+        { 
+          $inc: { 
+            commentsCount: -(1 + repliesToDecrement) 
+          } 
+        },
+        { session }
+      );
+
+      // If this was a reply, update parent comment's reply count
+      if (comment.parentCommentId) {
+        await this.commentModel.findByIdAndUpdate(
+          comment.parentCommentId,
+          { $inc: { replyCount: -1 } },
+          { session }
+        );
+      }
+
+      await session.commitTransaction();
+
+      // Emit socket event for real-time deletion
+      this.eventEmitter.emit('comment.deleted', {
+        commentId,
+        postId,
+        parentCommentId: comment.parentCommentId
+      });
+
+      return { 
+        success: true, 
+        message: 'Comment deleted successfully',
+        deletedCommentId: commentId,
+        parentCommentId: comment.parentCommentId
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   async toggleLike(postId: string, userId: string) {
