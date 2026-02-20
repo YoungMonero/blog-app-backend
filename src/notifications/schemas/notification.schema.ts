@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-export type NotificationType = 'like' | 'comment' | 'post' | 'subscribe' | 'mention';
+export type NotificationType = 'like' | 'comment' | 'post' | 'subscribe' | 'mention' | 'reply';
 
 @Schema ({ timestamps: true })
 
@@ -12,7 +12,7 @@ export class Notification extends Document {
     @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
     actorId: Types.ObjectId;     
   
-    @Prop({ required: true, enum: ['like', 'comment', 'post', 'subscribe', 'mention'] })
+    @Prop({ required: true, enum: ['like', 'comment', 'post', 'subscribe', 'mention', 'reply'] })
     type: NotificationType;
   
     @Prop({ type: Types.ObjectId, ref: 'Post' })
