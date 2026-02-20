@@ -10,7 +10,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     super({
       clientID: process.env.AUTH_GOOGLE_ID || '',
       clientSecret: process.env.AUTH_GOOGLE_SECRET || '',
-      callbackURL: 'http://localhost:4000/auth/google/callback',
+      callbackURL: 'https://postory-blog-app.vercel.app/auth/google/callback',
       scope: ['email', 'profile'],
     } as any); 
   }
