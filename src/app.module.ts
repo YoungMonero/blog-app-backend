@@ -29,12 +29,13 @@ import { SearchModule } from './search/search.module';
     
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
       validationSchema: Joi.object({
-
+        GOOGLE_CALLBACK_URL: Joi.string().uri().required(),
         MONGO_URI: Joi.string().required(),
         JWT_SECRET: Joi.string().required().min(10).messages({
-          'string.min': 'JWT_SECRET should be at least 10 characters long (you have {#length})',
-          'any.required': 'JWT_SECRET is required'
+        'string.min': 'JWT_SECRET should be at least 10 characters long (you have {#length})',
+        'any.required': 'JWT_SECRET is required'
         }),
         
         PORT: Joi.number().default(4000),

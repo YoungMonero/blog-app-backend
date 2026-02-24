@@ -2,15 +2,15 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-google-oauth20';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from '../auth.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-  
-  constructor(private readonly authService: AuthService) {
+  constructor(private readonly authService: AuthService, private configService: ConfigService) {
     super({
-      clientID: process.env.AUTH_GOOGLE_ID || '',
-      clientSecret: process.env.AUTH_GOOGLE_SECRET || '',
-      callbackURL: 'http://localhost:4000/auth/google/callback',
+      clientID: configService.get<string>('AUTH_GOOGLE_ID'),
+      clientSecret: configService.get<string>('AUTH_GOOGLE_SECRET'),
+      callbackURL: configService.get('GOOGLE_CALLBACK_URL'),
       scope: ['email', 'profile'],
     } as any); 
   }

@@ -5,7 +5,6 @@ import { MailerService } from '@nestjs-modules/mailer';
 export class EmailService {
   constructor(private mailerService: MailerService) {}
 
-  // Primary color for branding (Indigo to match your frontend)
   private readonly brandColor = '#4f46e5'; 
 
   async sendResetCode(email: string, resetCode: string) {

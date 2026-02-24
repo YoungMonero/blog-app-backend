@@ -4,7 +4,8 @@ import { CommentsService } from './comments.service';
 
 @Controller('posts/:postId')
 export class CommentsController {
-  constructor(private readonly commentsService: CommentsService) { }
+  constructor(private readonly commentsService: CommentsService) {
+   }
 
   @Post('comments')
   @UseGuards(JwtAuthGuard)
