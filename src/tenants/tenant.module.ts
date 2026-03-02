@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Tenant, TenantSchema } from './tenant.schema';
 import { TenantService } from './tenant.service';
 import { TenantController } from './tenant.controller';
+import { UsersModule } from 'src/users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
@@ -12,6 +13,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       { name: Tenant.name, schema: TenantSchema },
     ]),
     ConfigModule,
+    forwardRef(() => UsersModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

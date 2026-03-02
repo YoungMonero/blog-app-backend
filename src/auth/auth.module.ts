@@ -9,12 +9,16 @@ import { AuthController } from './auth.controller';
 import { User, UserSchema } from '../users/user.schema';
 import { Tenant, TenantSchema } from '../tenants/tenant.schema';
 import { TenantModule } from '../tenants/tenant.module';
-import { JwtAuthGuard } from './jwt-auth.guard'; // 👈 add guard here if you want to provide it
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { EmailModule } from '../email/email.module'; 
+import { GoogleStrategy } from './strategies/google.strategy'; 
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     ConfigModule,
-    PassportModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }), 
+    EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -28,9 +32,14 @@ import { JwtAuthGuard } from './jwt-auth.guard'; // 👈 add guard here if you w
       { name: Tenant.name, schema: TenantSchema },
     ]),
     TenantModule,
+    UsersModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard], // 👈 provide guard here
-  exports: [JwtModule, AuthService, JwtAuthGuard], // 👈 export so BlogsModule can use them
+  providers: [
+    AuthService, 
+    JwtAuthGuard, 
+    GoogleStrategy
+  ], 
+  exports: [JwtModule, AuthService, JwtAuthGuard],
 })
 export class AuthModule {}
